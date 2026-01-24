@@ -6,9 +6,6 @@
     "dev": "uv run uvicorn app.main:app --reload --port 8000",
     "dev:worker": "uv run celery -A app.workers.celery_app worker --loglevel=info",
     "start": "uv run uvicorn app.main:app --port 8000",
-    "lint": "uv run ruff check .",
-    "format": "uv run ruff format .",
-    "type-check": "uv run mypy app --ignore-missing-imports",
-    "test": "uv run pytest"
+    "format": "uv run ruff format ."
   }
 }

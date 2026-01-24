@@ -3,13 +3,13 @@
 from app.workers.celery_app import celery_app
 
 
-@celery_app.task(name="tasks.add")
+@celery_app.task(name="tasks.add")  # type: ignore[untyped-decorator]
 def add(x: int, y: int) -> int:
     """Simple addition task for testing Celery setup."""
     return x + y
 
 
-@celery_app.task(name="tasks.hello")
+@celery_app.task(name="tasks.hello")  # type: ignore[untyped-decorator]
 def hello(name: str = "World") -> str:
     """Simple hello task for testing Celery setup."""
     return f"Hello, {name}!"

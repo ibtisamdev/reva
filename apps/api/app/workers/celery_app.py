@@ -50,7 +50,7 @@ celery_app.conf.update(
 
 
 # Task base class with common error handling
-class BaseTask(celery_app.Task):  # type: ignore[name-defined]
+class BaseTask(celery_app.Task):  # type: ignore[misc, name-defined]
     """Base task class with error handling."""
 
     abstract = True

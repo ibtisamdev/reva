@@ -41,7 +41,7 @@ async def verify_token(token: str) -> dict[str, Any]:
         jwks_client = get_jwks_client()
         signing_key = jwks_client.get_signing_key_from_jwt(token)
 
-        payload = jwt.decode(
+        payload: dict[str, Any] = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
