@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@9.1.0",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo run dev @reva/api#dev:worker",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
