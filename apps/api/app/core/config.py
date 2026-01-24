@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, RedisDsn, computed_field
+from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -57,12 +57,6 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # Next.js dashboard
         "http://localhost:5173",  # Vite widget dev
     ]
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def database_url_sync(self) -> str:
-        """Get sync database URL for Alembic."""
-        return str(self.database_url).replace("+asyncpg", "")
 
 
 @lru_cache

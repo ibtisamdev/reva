@@ -18,11 +18,42 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the database URL from settings
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+# Set the database URL from settings (using async URL for asyncpg)
+config.set_main_option("sqlalchemy.url", str(settings.database_url))
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
+
+# Tables managed externally by Better Auth (JavaScript auth library)
+# These tables are created and managed by the Next.js web app, not by Alembic.
+# See: https://www.better-auth.com/docs/concepts/database
+BETTER_AUTH_TABLES = {
+    "user",
+    "session",
+    "account",
+    "verification",
+    # Organization plugin tables
+    "organization",
+    "member",
+    "invitation",
+    # JWT plugin tables
+    "jwks",
+}
+
+
+def include_name(name: str, type_: str, parent_names: dict) -> bool:
+    """Control which database objects Alembic considers during autogenerate.
+
+    This prevents Alembic from generating DROP statements for tables
+    managed by Better Auth (or other external systems).
+
+    See: https://alembic.sqlalchemy.org/en/latest/autogenerate.html#omitting-table-names-from-the-autogenerate-process
+    """
+    if type_ == "table":
+        # Skip tables managed by Better Auth
+        if name in BETTER_AUTH_TABLES:
+            return False
+    return True
 
 
 def run_migrations_offline() -> None:
@@ -44,6 +75,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():
@@ -57,6 +89,7 @@ def do_run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():
