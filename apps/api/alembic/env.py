@@ -41,7 +41,7 @@ BETTER_AUTH_TABLES = {
 }
 
 
-def include_name(name: str, type_: str, parent_names: dict) -> bool:
+def include_name(name: str, type_: str, _parent_names: dict) -> bool:
     """Control which database objects Alembic considers during autogenerate.
 
     This prevents Alembic from generating DROP statements for tables
@@ -49,11 +49,8 @@ def include_name(name: str, type_: str, parent_names: dict) -> bool:
 
     See: https://alembic.sqlalchemy.org/en/latest/autogenerate.html#omitting-table-names-from-the-autogenerate-process
     """
-    if type_ == "table":
-        # Skip tables managed by Better Auth
-        if name in BETTER_AUTH_TABLES:
-            return False
-    return True
+    # Skip tables managed by Better Auth
+    return not (type_ == "table" and name in BETTER_AUTH_TABLES)
 
 
 def run_migrations_offline() -> None:
