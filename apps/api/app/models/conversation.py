@@ -12,7 +12,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.message import Message
-    from app.models.organization import Organization
+    from app.models.store import Store
 
 
 class Channel(str, enum.Enum):
@@ -33,14 +33,18 @@ class ConversationStatus(str, enum.Enum):
 
 
 class Conversation(Base):
-    """Conversation model for chat sessions."""
+    """Conversation model for chat sessions.
+
+    Conversations are scoped to a store and track customer interactions.
+    Each conversation contains multiple messages and can be from different channels.
+    """
 
     __tablename__ = "conversations"
 
-    # Organization relationship
-    organization_id: Mapped[uuid.UUID] = mapped_column(
+    # Store relationship (replaces organization_id)
+    store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+        ForeignKey("stores.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -76,8 +80,8 @@ class Conversation(Base):
     )
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization",
+    store: Mapped["Store"] = relationship(
+        "Store",
         back_populates="conversations",
     )
     messages: Mapped[list["Message"]] = relationship(

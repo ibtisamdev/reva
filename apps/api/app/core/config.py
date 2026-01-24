@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     secret_key: str = "CHANGE-ME-IN-PRODUCTION-use-openssl-rand-hex-32"
     encryption_key: str = "CHANGE-ME-IN-PRODUCTION-use-openssl-rand-hex-32"
 
+    # Authentication (Better Auth)
+    auth_url: str = "http://localhost:3000"  # Next.js app URL where Better Auth runs
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:3000",  # Next.js dashboard

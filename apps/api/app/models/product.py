@@ -1,37 +1,44 @@
-"""Product model for synced Shopify products."""
+"""Product model for synced e-commerce products."""
 
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.organization import Organization
+    from app.models.store import Store
 
 
 class Product(Base):
-    """Product model synced from Shopify."""
+    """Product model synced from e-commerce platforms.
+
+    Products are scoped to a store and synced from the connected platform.
+    The platform_product_id is the external ID from the platform (Shopify, WooCommerce, etc.).
+    """
 
     __tablename__ = "products"
 
-    # Organization relationship
-    organization_id: Mapped[uuid.UUID] = mapped_column(
+    # Store relationship (replaces organization_id)
+    store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+        ForeignKey("stores.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Platform product identifier (external ID from Shopify/WooCommerce/etc.)
+    platform_product_id: Mapped[str] = mapped_column(
+        String(255),
         nullable=False,
     )
 
-    # Shopify product data
-    shopify_product_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-    )
+    # Product data
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     handle: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -73,20 +80,20 @@ class Product(Base):
     )
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization",
+    store: Mapped["Store"] = relationship(
+        "Store",
         back_populates="products",
     )
 
     # Indexes
     __table_args__ = (
         Index(
-            "ix_products_organization_shopify_id",
-            "organization_id",
-            "shopify_product_id",
+            "ix_products_store_platform_id",
+            "store_id",
+            "platform_product_id",
             unique=True,
         ),
     )
 
     def __repr__(self) -> str:
-        return f"<Product {self.title} ({self.shopify_product_id})>"
+        return f"<Product {self.title} ({self.platform_product_id})>"

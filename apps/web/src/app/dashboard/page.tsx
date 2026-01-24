@@ -1,17 +1,29 @@
-import { UserButton } from '@clerk/nextjs';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-export default function DashboardPage() {
+import { UserMenu } from '@/components/auth/user-menu';
+import { auth } from '@/lib/auth';
+
+export default async function DashboardPage() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session) {
+    redirect('/sign-in');
+  }
+
   return (
     <div className="min-h-screen">
       <header className="border-b">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <h1 className="text-xl font-bold">Reva Dashboard</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
       <main className="container mx-auto p-8">
         <div className="rounded-lg border p-8 text-center">
-          <h2 className="mb-4 text-2xl font-semibold">Welcome to Reva!</h2>
+          <h2 className="mb-4 text-2xl font-semibold">Welcome, {session.user.name || 'User'}!</h2>
           <p className="text-muted-foreground">
             Your AI-powered customer support dashboard. Connect your Shopify store to get started.
           </p>

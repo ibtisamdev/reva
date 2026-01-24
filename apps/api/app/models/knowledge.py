@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.organization import Organization
+    from app.models.store import Store
 
 
 class ContentType(str, enum.Enum):
@@ -25,14 +25,18 @@ class ContentType(str, enum.Enum):
 
 
 class KnowledgeArticle(Base):
-    """Knowledge article model for FAQs, policies, etc."""
+    """Knowledge article model for FAQs, policies, etc.
+
+    Knowledge articles are scoped to a store and used for RAG-based responses.
+    Each article can be split into chunks for better retrieval.
+    """
 
     __tablename__ = "knowledge_articles"
 
-    # Organization relationship
-    organization_id: Mapped[uuid.UUID] = mapped_column(
+    # Store relationship (replaces organization_id)
+    store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+        ForeignKey("stores.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -57,8 +61,8 @@ class KnowledgeArticle(Base):
     )
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization",
+    store: Mapped["Store"] = relationship(
+        "Store",
         back_populates="knowledge_articles",
     )
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(
