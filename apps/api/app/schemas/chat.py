@@ -1,6 +1,7 @@
 """Pydantic schemas for chat functionality."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -28,7 +29,7 @@ class MessageCreate(BaseSchema):
     """Schema for creating a chat message."""
 
     message: str = Field(..., min_length=1, max_length=4000)
-    context: dict | None = None  # page_url, product_id, etc.
+    context: dict[str, Any] | None = None  # page_url, product_id, etc.
 
 
 class MessageResponse(BaseSchema):
@@ -74,7 +75,7 @@ class ChatRequest(BaseSchema):
     conversation_id: UUID | None = None  # None = new conversation
     message: str = Field(..., min_length=1, max_length=4000)
     session_id: str | None = None  # For widget tracking
-    context: dict | None = None  # page_url, product_id, etc.
+    context: dict[str, Any] | None = None  # page_url, product_id, etc.
 
 
 class ChatResponse(BaseSchema):

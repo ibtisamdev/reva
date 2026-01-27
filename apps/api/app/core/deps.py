@@ -1,7 +1,7 @@
 """Dependency injection for FastAPI routes."""
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
@@ -61,7 +61,7 @@ async def get_store_by_id(
     return store
 
 
-def get_user_organization_id(user: dict) -> str:
+def get_user_organization_id(user: dict[str, Any]) -> str:
     """Extract organization ID from the authenticated user's JWT payload.
 
     Better Auth's JWT includes activeOrganizationId when a user has an active org.
@@ -72,7 +72,7 @@ def get_user_organization_id(user: dict) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active organization. Please select or create an organization.",
         )
-    return org_id
+    return str(org_id)
 
 
 async def get_store_for_user(

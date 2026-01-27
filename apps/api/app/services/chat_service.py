@@ -5,7 +5,11 @@ from typing import Any
 from uuid import UUID
 
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -242,12 +246,12 @@ class ChatService:
             # Skip the current message if it was just added
             if msg.content == user_message and msg.role == MessageRole.USER:
                 continue
-            messages.append(
-                {
-                    "role": msg.role.value,  # type: ignore[typeddict-item]
-                    "content": msg.content,
-                }
-            )
+            if msg.role == MessageRole.USER:
+                messages.append(ChatCompletionUserMessageParam(role="user", content=msg.content))
+            elif msg.role == MessageRole.ASSISTANT:
+                messages.append(
+                    ChatCompletionAssistantMessageParam(role="assistant", content=msg.content)
+                )
 
         # Add current user message
         messages.append({"role": "user", "content": user_message})

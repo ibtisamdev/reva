@@ -101,7 +101,7 @@ class StoreSettingsUpdate(BaseSchema):
 
 
 # Default settings
-DEFAULT_WIDGET_SETTINGS: dict = {
+DEFAULT_WIDGET_SETTINGS: dict[str, dict[str, str]] = {
     "widget": {
         "primary_color": "#0d9488",
         "welcome_message": "Hi! How can I help you today?",
