@@ -3,11 +3,12 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import DBSession, OptionalUser
-from app.models.conversation import Conversation
+from app.core.deps import DBSession, OptionalUser, get_store_by_id
+from app.models.conversation import Conversation, ConversationStatus
 from app.models.store import Store
 from app.schemas.chat import (
     ChatRequest,
@@ -19,34 +20,6 @@ from app.schemas.chat import (
 from app.services.chat_service import ChatService
 
 router = APIRouter()
-
-
-# === Dependencies ===
-
-
-async def get_store_by_id(
-    store_id: UUID = Query(..., description="Store ID for the chat widget"),
-    db: DBSession = None,  # type: ignore[assignment]
-) -> Store:
-    """Get store from query parameter.
-
-    The chat widget sends store_id as a query parameter since
-    end users aren't authenticated dashboard users.
-    """
-    query = select(Store).where(
-        Store.id == store_id,
-        Store.is_active == True,  # noqa: E712
-    )
-    result = await db.execute(query)
-    store = result.scalar_one_or_none()
-
-    if not store:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Store not found or inactive",
-        )
-
-    return store
 
 
 # === Endpoints ===
@@ -158,8 +131,8 @@ async def get_conversation(
     summary="List conversations by session",
 )
 async def list_conversations_by_session(
+    db: DBSession,
     session_id: str = Query(..., description="Session ID from widget"),
-    db: DBSession = None,  # type: ignore[assignment]
     store: Store = Depends(get_store_by_id),
 ) -> list[ConversationDetailResponse]:
     """List conversations for a session.
@@ -205,3 +178,74 @@ async def list_conversations_by_session(
         )
         for c in conversations
     ]
+
+
+# === Status Update Schema ===
+
+
+class ConversationStatusUpdate(BaseModel):
+    """Schema for updating conversation status."""
+
+    status: ConversationStatus
+
+
+@router.patch(
+    "/conversations/{conversation_id}/status",
+    response_model=ConversationDetailResponse,
+    summary="Update conversation status",
+    description="Update the status of a conversation (active, resolved, escalated).",
+)
+async def update_conversation_status(
+    conversation_id: UUID,
+    data: ConversationStatusUpdate,
+    db: DBSession,
+    store: Store = Depends(get_store_by_id),
+) -> ConversationDetailResponse:
+    """Update conversation status.
+
+    Used by dashboard to mark conversations as resolved or escalated.
+    """
+    query = (
+        select(Conversation)
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.store_id == store.id,
+        )
+        .options(selectinload(Conversation.messages))
+    )
+
+    result = await db.execute(query)
+    conversation = result.scalar_one_or_none()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+
+    conversation.status = data.status
+    await db.commit()
+    await db.refresh(conversation)
+
+    return ConversationDetailResponse(
+        id=conversation.id,
+        store_id=conversation.store_id,
+        session_id=conversation.session_id,
+        channel=conversation.channel,
+        status=conversation.status,
+        customer_email=conversation.customer_email,
+        customer_name=conversation.customer_name,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        messages=[
+            MessageResponse(
+                id=m.id,
+                role=m.role,
+                content=m.content,
+                sources=[SourceReference(**s) for s in m.sources] if m.sources else None,
+                tokens_used=m.tokens_used,
+                created_at=m.created_at,
+            )
+            for m in conversation.messages
+        ],
+    )
