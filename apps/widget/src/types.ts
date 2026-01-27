@@ -128,7 +128,8 @@ export type ApiErrorType =
   | 'rate_limited' // Too many requests (429)
   | 'server_error' // 500+ errors
   | 'invalid_response' // Malformed response
-  | 'store_not_found'; // Store doesn't exist (404)
+  | 'store_not_found' // Store doesn't exist (404)
+  | 'not_configured'; // Widget not configured (missing storeId)
 
 /**
  * Structured API error with retry information.

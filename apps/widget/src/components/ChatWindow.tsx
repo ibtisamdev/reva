@@ -3,12 +3,12 @@
  * Handles message sending, API integration, and conversation state.
  */
 
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 
-import type { ApiError, Message } from '../types';
-import { sendMessage, isApiError } from '../lib/api';
+import { isApiError, sendMessage } from '../lib/api';
 import { getPageContext } from '../lib/context';
-import { getSessionId, getConversationId, setConversationId } from '../lib/session';
+import { getConversationId, getSessionId, setConversationId } from '../lib/session';
+import type { ApiError, Message } from '../types';
 import { ChatMessage } from './ChatMessage';
 
 interface ChatWindowProps {
@@ -17,7 +17,11 @@ interface ChatWindowProps {
   onClose: () => void;
 }
 
-export function ChatWindow({ storeId, apiUrl = 'http://localhost:8000', onClose }: ChatWindowProps) {
+export function ChatWindow({
+  storeId,
+  apiUrl = 'http://localhost:8000',
+  onClose,
+}: ChatWindowProps) {
   // Message state
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -43,12 +47,25 @@ export function ChatWindow({ storeId, apiUrl = 'http://localhost:8000', onClose 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Check if widget is properly configured
+  const isConfigured = Boolean(storeId);
+
   /**
    * Handle form submission - send message to API.
    */
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+
+    // Check if storeId is configured
+    if (!isConfigured) {
+      setError({
+        type: 'not_configured',
+        message: 'Chat is not available. Please contact the site administrator.',
+        retryable: false,
+      });
+      return;
+    }
 
     // Create user message
     const userMessage: Message = {
@@ -138,7 +155,13 @@ export function ChatWindow({ storeId, apiUrl = 'http://localhost:8000', onClose 
             justifyContent: 'center',
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.8 }}>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            style={{ opacity: 0.8 }}
+          >
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
           </svg>
         </button>

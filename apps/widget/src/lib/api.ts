@@ -39,21 +39,55 @@ export function isApiError(result: unknown): result is ApiError {
 }
 
 /**
+ * Parse error message from API response.
+ * FastAPI returns errors in format: {"detail": "message"} or {"detail": [{"msg": "message"}]}
+ */
+function parseErrorMessage(responseText: string): string {
+  try {
+    const parsed = JSON.parse(responseText);
+
+    // Handle FastAPI validation errors: {"detail": [{"msg": "...", "type": "..."}]}
+    if (Array.isArray(parsed.detail)) {
+      const firstError = parsed.detail[0];
+      if (firstError?.msg) {
+        // Make the message more user-friendly
+        if (firstError.type === 'uuid_parsing' || firstError.msg.includes('UUID')) {
+          return 'Invalid store configuration. Please contact support.';
+        }
+        return firstError.msg;
+      }
+    }
+
+    // Handle simple error: {"detail": "message"}
+    if (typeof parsed.detail === 'string') {
+      return parsed.detail;
+    }
+
+    return 'An error occurred. Please try again.';
+  } catch {
+    // Not JSON, return generic message
+    return 'An error occurred. Please try again.';
+  }
+}
+
+/**
  * Map HTTP status codes to error types.
  */
 function getErrorFromStatus(status: number, responseText: string): ApiError {
+  const message = parseErrorMessage(responseText);
+
   switch (status) {
     case 404:
       return createError('store_not_found', 'Store not found or inactive.', false);
     case 429:
       return createError('rate_limited', 'Too many requests. Please wait a moment.', true);
     case 422:
-      return createError('invalid_response', responseText || 'Invalid request.', false);
+      return createError('invalid_response', message, false);
     default:
       if (status >= 500) {
         return createError('server_error', 'Server error. Please try again.', true);
       }
-      return createError('invalid_response', `Unexpected error (${status}).`, false);
+      return createError('invalid_response', message, false);
   }
 }
 

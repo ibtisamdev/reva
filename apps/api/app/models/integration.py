@@ -54,7 +54,7 @@ class StoreIntegration(Base):
 
     # Platform information
     platform: Mapped[PlatformType] = mapped_column(
-        Enum(PlatformType, name="platform_type"),
+        Enum(PlatformType, name="platform_type", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     platform_store_id: Mapped[str] = mapped_column(
@@ -79,7 +79,11 @@ class StoreIntegration(Base):
 
     # Status tracking
     status: Mapped[IntegrationStatus] = mapped_column(
-        Enum(IntegrationStatus, name="integration_status"),
+        Enum(
+            IntegrationStatus,
+            name="integration_status",
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=IntegrationStatus.PENDING,
         nullable=False,
     )

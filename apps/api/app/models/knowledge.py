@@ -45,7 +45,7 @@ class KnowledgeArticle(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[ContentType] = mapped_column(
-        Enum(ContentType, name="content_type"),
+        Enum(ContentType, name="content_type", values_callable=lambda x: [e.value for e in x]),
         default=ContentType.FAQ,
         nullable=False,
     )

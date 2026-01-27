@@ -1,14 +1,18 @@
 """FastAPI application entry point."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -44,6 +48,18 @@ def create_app() -> FastAPI:
 
     # Include API routes
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    # Global exception handler to ensure CORS headers are present on 500 errors
+    # Without this, unhandled exceptions cause the response to skip CORS middleware,
+    # making browsers show "CORS blocked" instead of the actual error
+    @app.exception_handler(Exception)
+    async def global_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+        """Handle unhandled exceptions with proper JSON response."""
+        logger.exception("Unhandled exception: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
     # Root endpoint
     @app.get("/")

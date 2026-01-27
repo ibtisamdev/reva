@@ -3,9 +3,10 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.knowledge import KnowledgeArticle, KnowledgeChunk
 from app.services.embedding_service import get_embedding_service
 
 
@@ -59,36 +60,30 @@ class RetrievalService:
         # Which means distance <= 1 - threshold
         max_distance = 1 - threshold
 
-        # Build the vector search query with cosine distance
-        # Using raw SQL for pgvector operators
-        sql = text("""
-            SELECT
-                kc.id as chunk_id,
-                kc.article_id,
-                kc.content,
-                kc.chunk_index,
-                1 - (kc.embedding <=> :query_embedding::vector) as similarity,
-                ka.title as article_title,
-                ka.source_url as article_url
-            FROM knowledge_chunks kc
-            JOIN knowledge_articles ka ON kc.article_id = ka.id
-            WHERE ka.store_id = :store_id
-                AND kc.embedding IS NOT NULL
-                AND (kc.embedding <=> :query_embedding::vector) <= :max_distance
-            ORDER BY kc.embedding <=> :query_embedding::vector
-            LIMIT :top_k
-        """)
-
-        result = await self.db.execute(
-            sql,
-            {
-                "query_embedding": str(query_embedding),
-                "store_id": str(store_id),
-                "max_distance": max_distance,
-                "top_k": top_k,
-            },
+        # Build the vector search query using SQLAlchemy ORM with pgvector's
+        # native cosine_distance() method - this avoids the ::vector cast syntax
+        # that conflicts with SQLAlchemy's :param binding in raw SQL
+        stmt = (
+            select(
+                KnowledgeChunk.id.label("chunk_id"),
+                KnowledgeChunk.article_id,
+                KnowledgeChunk.content,
+                KnowledgeChunk.chunk_index,
+                (1 - KnowledgeChunk.embedding.cosine_distance(query_embedding)).label("similarity"),
+                KnowledgeArticle.title.label("article_title"),
+                KnowledgeArticle.source_url.label("article_url"),
+            )
+            .join(KnowledgeArticle, KnowledgeChunk.article_id == KnowledgeArticle.id)
+            .where(
+                KnowledgeArticle.store_id == store_id,
+                KnowledgeChunk.embedding.isnot(None),
+                KnowledgeChunk.embedding.cosine_distance(query_embedding) <= max_distance,
+            )
+            .order_by(KnowledgeChunk.embedding.cosine_distance(query_embedding))
+            .limit(top_k)
         )
 
+        result = await self.db.execute(stmt)
         rows = result.fetchall()
 
         return [
@@ -127,34 +122,28 @@ class RetrievalService:
         """
         query_embedding = await self.embedding_service.generate_embedding(query)
 
-        sql = text("""
-            SELECT
-                kc.id as chunk_id,
-                kc.article_id,
-                kc.content,
-                kc.chunk_index,
-                1 - (kc.embedding <=> :query_embedding::vector) as similarity,
-                ka.title as article_title,
-                ka.source_url as article_url
-            FROM knowledge_chunks kc
-            JOIN knowledge_articles ka ON kc.article_id = ka.id
-            WHERE ka.store_id = :store_id
-                AND kc.article_id = :article_id
-                AND kc.embedding IS NOT NULL
-            ORDER BY kc.embedding <=> :query_embedding::vector
-            LIMIT :top_k
-        """)
-
-        result = await self.db.execute(
-            sql,
-            {
-                "query_embedding": str(query_embedding),
-                "store_id": str(store_id),
-                "article_id": str(article_id),
-                "top_k": top_k,
-            },
+        # Use SQLAlchemy ORM with pgvector's native cosine_distance() method
+        stmt = (
+            select(
+                KnowledgeChunk.id.label("chunk_id"),
+                KnowledgeChunk.article_id,
+                KnowledgeChunk.content,
+                KnowledgeChunk.chunk_index,
+                (1 - KnowledgeChunk.embedding.cosine_distance(query_embedding)).label("similarity"),
+                KnowledgeArticle.title.label("article_title"),
+                KnowledgeArticle.source_url.label("article_url"),
+            )
+            .join(KnowledgeArticle, KnowledgeChunk.article_id == KnowledgeArticle.id)
+            .where(
+                KnowledgeArticle.store_id == store_id,
+                KnowledgeChunk.article_id == article_id,
+                KnowledgeChunk.embedding.isnot(None),
+            )
+            .order_by(KnowledgeChunk.embedding.cosine_distance(query_embedding))
+            .limit(top_k)
         )
 
+        result = await self.db.execute(stmt)
         rows = result.fetchall()
 
         return [

@@ -62,12 +62,16 @@ class Conversation(Base):
 
     # Channel and status
     channel: Mapped[Channel] = mapped_column(
-        Enum(Channel, name="channel"),
+        Enum(Channel, name="channel", values_callable=lambda x: [e.value for e in x]),
         default=Channel.WIDGET,
         nullable=False,
     )
     status: Mapped[ConversationStatus] = mapped_column(
-        Enum(ConversationStatus, name="conversation_status"),
+        Enum(
+            ConversationStatus,
+            name="conversation_status",
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=ConversationStatus.ACTIVE,
         nullable=False,
     )
