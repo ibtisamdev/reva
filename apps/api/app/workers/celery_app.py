@@ -11,6 +11,7 @@ celery_app = Celery(
     backend=str(settings.redis_url),
     include=[
         "app.workers.tasks.example",
+        "app.workers.tasks.embedding",
         # Future task modules:
         # "app.workers.tasks.sync",
         # "app.workers.tasks.recovery",

@@ -92,6 +92,7 @@ class KnowledgeChunk(Base):
     # Chunk content
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Vector embedding for semantic search
     embedding: Mapped[list[float] | None] = mapped_column(

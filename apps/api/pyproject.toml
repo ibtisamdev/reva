@@ -20,6 +20,10 @@ dependencies = [
     "cryptography>=44.0.0",
     "python-multipart>=0.0.20",
     "pyjwt>=2.10.1",
+    # AI/RAG dependencies
+    "openai>=1.59.0",
+    "tiktoken>=0.8.0",
+    "pypdf>=5.0.0",
 ]
 
 [project.optional-dependencies]
