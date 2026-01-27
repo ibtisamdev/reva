@@ -44,9 +44,13 @@ async def list_stores(
     org_id = get_user_organization_id(user)
 
     # Get stores for the organization
-    query = select(Store).where(
-        Store.organization_id == org_id,
-    ).order_by(Store.created_at.desc())
+    query = (
+        select(Store)
+        .where(
+            Store.organization_id == org_id,
+        )
+        .order_by(Store.created_at.desc())
+    )
 
     result = await db.execute(query)
     stores = list(result.scalars().all())
