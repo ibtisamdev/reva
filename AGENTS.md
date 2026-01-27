@@ -106,6 +106,10 @@ import { Button } from '@/components/ui/button';
 - `'use client'` directive for client components
 - shadcn/ui components from `@/components/ui/`
 
+## Design System
+
+See **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)** for complete design documentation and **[design-tokens.json](./design-tokens.json)** for the source of truth on colors, typography, and spacing.
+
 ## Architecture
 
 ### Backend Structure
