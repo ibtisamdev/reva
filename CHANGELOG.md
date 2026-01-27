@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **RAG Pipeline** (Phase 1 of M1 - Product Q&A Bot)
+- **Widget API Integration** (Phase 2 of M1)
+  - Connected chat widget to backend API with session persistence and error handling
+  - Citation display for AI responses with source links
+  - Theme customization via `window.RevaConfig` for store branding
+
+- **RAG Pipeline** (Phase 1 of M1)
   - Knowledge ingestion service with automatic text chunking (512 tokens, 50 token overlap)
   - OpenAI `text-embedding-3-small` embeddings (1536 dimensions)
   - pgvector similarity search for semantic retrieval
@@ -38,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Widget styles aligned with design system (teal primary)
 - Updated `app/api/v1/router.py` to register knowledge and chat routes
 - Updated `app/workers/celery_app.py` to include embedding task module
 

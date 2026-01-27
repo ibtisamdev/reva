@@ -1,14 +1,15 @@
+/**
+ * Root Widget component.
+ * Manages open/close state and applies theme customization.
+ */
+
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 
+import type { WidgetConfig } from '../types';
+import { getThemeVariables } from '../lib/config';
 import { ChatWindow } from './ChatWindow';
 import { ToggleButton } from './ToggleButton';
-
-interface WidgetConfig {
-  organizationId: string;
-  primaryColor?: string;
-  position?: 'left' | 'right';
-}
 
 interface WidgetProps {
   config: WidgetConfig;
@@ -17,15 +18,16 @@ interface WidgetProps {
 export function Widget({ config }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const style: JSX.CSSProperties | undefined = config.primaryColor
-    ? { '--reva-primary': config.primaryColor }
-    : undefined;
+  // Compute theme CSS variables from config
+  // This allows store owners to customize the primary color
+  const themeStyle: JSX.CSSProperties = getThemeVariables(config.theme?.primaryColor);
 
   return (
-    <div className="reva-widget" style={style}>
+    <div className="reva-widget" style={themeStyle}>
       {isOpen && (
         <ChatWindow
-          organizationId={config.organizationId}
+          storeId={config.storeId}
+          apiUrl={config.apiUrl}
           onClose={() => setIsOpen(false)}
         />
       )}
