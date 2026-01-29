@@ -5,7 +5,11 @@ from typing import Any
 from uuid import UUID
 
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionUserMessageParam,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,7 +79,7 @@ class ChatService:
             query=request.message,
             store_id=store.id,
             top_k=5,
-            threshold=0.7,
+            threshold=0.5,
         )
 
         # Get conversation history
@@ -101,7 +105,7 @@ class ChatService:
             conversation_id=conversation.id,
             role=MessageRole.ASSISTANT,
             content=response_content,
-            sources=[s.model_dump() for s in sources],
+            sources=[s.model_dump(mode="json") for s in sources],
             tokens_used=tokens_used,
         )
 
@@ -242,12 +246,12 @@ class ChatService:
             # Skip the current message if it was just added
             if msg.content == user_message and msg.role == MessageRole.USER:
                 continue
-            messages.append(
-                {
-                    "role": msg.role.value,  # type: ignore[typeddict-item]
-                    "content": msg.content,
-                }
-            )
+            if msg.role == MessageRole.USER:
+                messages.append(ChatCompletionUserMessageParam(role="user", content=msg.content))
+            elif msg.role == MessageRole.ASSISTANT:
+                messages.append(
+                    ChatCompletionAssistantMessageParam(role="assistant", content=msg.content)
+                )
 
         # Add current user message
         messages.append({"role": "user", "content": user_message})

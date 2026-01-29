@@ -1,34 +1,90 @@
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+'use client';
 
-import { UserMenu } from '@/components/auth/user-menu';
-import { auth } from '@/lib/auth';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSession } from '@/lib/auth-client';
 
-export default async function DashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+export default function DashboardPage() {
+  const { data: session } = useSession();
 
-  if (!session) {
-    redirect('/sign-in');
-  }
+  const userName = session?.user?.name || 'User';
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-xl font-bold">Reva Dashboard</h1>
-          <UserMenu />
-        </div>
-      </header>
-      <main className="container mx-auto p-8">
-        <div className="rounded-lg border p-8 text-center">
-          <h2 className="mb-4 text-2xl font-semibold">Welcome, {session.user.name || 'User'}!</h2>
-          <p className="text-muted-foreground">
-            Your AI-powered customer support dashboard. Connect your Shopify store to get started.
-          </p>
-        </div>
-      </main>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Welcome back, {userName}!</CardTitle>
+          <CardDescription>
+            Your AI-powered customer support dashboard. Here&apos;s an overview of your store&apos;s
+            support activity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Conversations</CardDescription>
+                <CardTitle className="text-3xl">0</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Knowledge Articles</CardDescription>
+                <CardTitle className="text-3xl">0</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Active Sessions</CardDescription>
+                <CardTitle className="text-3xl">0</CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Getting Started</CardTitle>
+          <CardDescription>Complete these steps to set up your AI support agent.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                1
+              </div>
+              <div>
+                <p className="font-medium">Add knowledge base content</p>
+                <p className="text-sm text-muted-foreground">
+                  Upload FAQs, policies, and product information.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                2
+              </div>
+              <div>
+                <p className="font-medium">Customize your widget</p>
+                <p className="text-sm text-muted-foreground">
+                  Set colors, welcome message, and position.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                3
+              </div>
+              <div>
+                <p className="font-medium">Install on your store</p>
+                <p className="text-sm text-muted-foreground">
+                  Copy the embed code to your Shopify theme.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

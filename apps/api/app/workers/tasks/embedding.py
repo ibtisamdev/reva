@@ -1,6 +1,7 @@
 """Celery tasks for async embedding generation."""
 
 import asyncio
+from typing import Any
 from uuid import UUID
 
 from app.core.database import async_session_maker
@@ -8,12 +9,12 @@ from app.services.knowledge_service import KnowledgeService
 from app.workers.celery_app import BaseTask, celery_app
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="tasks.embedding.process_article",
     base=BaseTask,
     bind=True,
 )
-def process_article_embeddings(self: BaseTask, article_id: str) -> dict:  # noqa: ARG001
+def process_article_embeddings(self: BaseTask, article_id: str) -> dict[str, Any]:  # noqa: ARG001
     """Process embeddings for a knowledge article.
 
     This task is triggered for large documents that need
@@ -35,7 +36,7 @@ def process_article_embeddings(self: BaseTask, article_id: str) -> dict:  # noqa
         loop.close()
 
 
-async def _process_article_embeddings_async(article_id: UUID) -> dict:
+async def _process_article_embeddings_async(article_id: UUID) -> dict[str, Any]:
     """Async implementation of embedding processing.
 
     Args:

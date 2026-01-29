@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 
 export const auth = betterAuth({
   database: new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.AUTH_DATABASE_URL,
   }),
 
   emailAndPassword: {
@@ -52,6 +52,15 @@ export const auth = betterAuth({
         keyPairConfig: {
           alg: 'RS256',
         },
+      },
+      jwt: {
+        definePayload: ({ user, session }) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          activeOrganizationId: session.activeOrganizationId,
+        }),
       },
     }),
     nextCookies(), // Must be last

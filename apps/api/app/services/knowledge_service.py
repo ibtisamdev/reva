@@ -1,5 +1,6 @@
 """Knowledge management service for articles and chunks."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -13,6 +14,8 @@ from app.schemas.knowledge import (
     TextIngestionRequest,
 )
 from app.services.embedding_service import get_embedding_service
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeService:
@@ -216,11 +219,17 @@ class KnowledgeService:
 
         # Generate embeddings synchronously if requested
         if process_sync:
-            texts = [chunk.content for chunk in chunks]
-            embeddings = await self.embedding_service.generate_embeddings_batch(texts)
-            for chunk, embedding in zip(chunks, embeddings, strict=True):
-                chunk.embedding = embedding
-            await self.db.flush()
+            try:
+                texts = [chunk.content for chunk in chunks]
+                embeddings = await self.embedding_service.generate_embeddings_batch(texts)
+                for chunk, embedding in zip(chunks, embeddings, strict=True):
+                    chunk.embedding = embedding
+                await self.db.flush()
+                logger.info(
+                    "Generated embeddings for %d chunks of article '%s'", len(chunks), data.title
+                )
+            except Exception:
+                logger.exception("Failed to generate embeddings for article '%s'", data.title)
 
         # Refresh to get the chunks relationship loaded
         await self.db.refresh(article, ["chunks"])

@@ -1,5 +1,6 @@
 """JWT authentication for FastAPI using Better Auth JWKS."""
 
+import asyncio
 from typing import Annotated, Any
 
 import jwt
@@ -14,6 +15,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 # JWKS client for fetching public keys from Better Auth
 _jwks_client: PyJWKClient | None = None
+_jwks_lock = asyncio.Lock()
 
 
 def get_jwks_client() -> PyJWKClient:
@@ -68,9 +70,13 @@ async def verify_token(token: str) -> dict[str, Any]:
             headers={"WWW-Authenticate": "Bearer"},
         )
     except PyJWKClientError as e:
+        # Reset cached client so next request retries fresh
+        async with _jwks_lock:
+            global _jwks_client
+            _jwks_client = None
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Unable to verify token: {str(e)}",
+            detail=f"Authentication service unavailable. Unable to verify token: {str(e)}",
         )
 
 

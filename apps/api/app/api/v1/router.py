@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import chat, health, knowledge
+from app.api.v1 import chat, health, knowledge, stores
 
 api_router = APIRouter()
 
@@ -21,6 +21,13 @@ api_router.include_router(
     chat.router,
     prefix="/chat",
     tags=["chat"],
+)
+
+# Store settings endpoints
+api_router.include_router(
+    stores.router,
+    prefix="/stores",
+    tags=["stores"],
 )
 
 # Future routes will be added here:
