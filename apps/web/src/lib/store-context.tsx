@@ -147,10 +147,13 @@ export function useStore() {
 
 /**
  * Hook to get the currently selected store ID.
- * Returns null if no store is selected - pages should render NoStoreState in this case.
+ * Only use within dashboard pages - the layout guarantees a store is selected.
  */
-export function useRequiredStoreId(): string | null {
+export function useRequiredStoreId(): string {
   const { selectedStoreId } = useStore();
+  if (!selectedStoreId) {
+    throw new Error('useRequiredStoreId must be used within a page where a store is guaranteed');
+  }
   return selectedStoreId;
 }
 

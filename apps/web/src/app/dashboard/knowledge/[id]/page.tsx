@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { NoStoreState } from '@/components/dashboard/no-store-state';
 import {
   deleteKnowledgeArticle,
   getKnowledgeArticle,
@@ -52,9 +51,8 @@ export default function KnowledgeEditPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: article, isLoading } = useQuery({
-    queryKey: knowledgeKeys.detail(storeId ?? '', articleId),
-    queryFn: () => getKnowledgeArticle(articleId, storeId!),
-    enabled: !!storeId,
+    queryKey: knowledgeKeys.detail(storeId, articleId),
+    queryFn: () => getKnowledgeArticle(articleId, storeId),
   });
 
   // Populate form when article loads
@@ -68,7 +66,7 @@ export default function KnowledgeEditPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateKnowledgeRequest) =>
-      updateKnowledgeArticle(articleId, storeId!, data),
+      updateKnowledgeArticle(articleId, storeId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.all });
       toast.success('Article updated');
@@ -81,7 +79,7 @@ export default function KnowledgeEditPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteKnowledgeArticle(articleId, storeId!),
+    mutationFn: () => deleteKnowledgeArticle(articleId, storeId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: knowledgeKeys.lists() });
       toast.success('Article deleted');
@@ -93,11 +91,6 @@ export default function KnowledgeEditPage() {
       });
     },
   });
-
-  // Show onboarding when no store is selected
-  if (!storeId) {
-    return <NoStoreState />;
-  }
 
   const handleSave = () => {
     const data: UpdateKnowledgeRequest = {};

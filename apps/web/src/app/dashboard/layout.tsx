@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { Providers } from '@/app/providers';
+import { DashboardContent } from '@/components/dashboard/dashboard-content';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Toaster } from '@/components/ui/sonner';
@@ -26,7 +27,9 @@ export default async function DashboardLayout({
         <Sidebar />
         <div className="flex flex-1 flex-col">
           <DashboardHeader />
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-6">
+            <DashboardContent>{children}</DashboardContent>
+          </main>
         </div>
       </div>
       <Toaster />

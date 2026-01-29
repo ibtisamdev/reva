@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { MessageThread } from '@/components/conversations/message-thread';
 import { CustomerSidebar } from '@/components/conversations/customer-sidebar';
-import { NoStoreState } from '@/components/dashboard/no-store-state';
 import {
   getConversation,
   updateConversationStatus,
@@ -31,9 +30,8 @@ export default function ConversationDetailPage({
   const storeId = useRequiredStoreId();
 
   const { data: conversation, isLoading } = useQuery({
-    queryKey: conversationKeys.detail(storeId ?? '', id),
-    queryFn: () => getConversation(id, storeId!),
-    enabled: !!storeId,
+    queryKey: conversationKeys.detail(storeId, id),
+    queryFn: () => getConversation(id, storeId),
     // Poll for active conversations to get new messages
     refetchInterval: (query) => {
       if (query.state.data?.status === 'active') {
@@ -44,10 +42,10 @@ export default function ConversationDetailPage({
   });
 
   const resolveStatusMutation = useMutation({
-    mutationFn: () => updateConversationStatus(id, storeId!, 'resolved'),
+    mutationFn: () => updateConversationStatus(id, storeId, 'resolved'),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: conversationKeys.detail(storeId!, id),
+        queryKey: conversationKeys.detail(storeId, id),
       });
       queryClient.invalidateQueries({
         queryKey: conversationKeys.lists(),
@@ -58,11 +56,6 @@ export default function ConversationDetailPage({
       toast.error('Failed to update conversation status');
     },
   });
-
-  // Show onboarding when no store is selected
-  if (!storeId) {
-    return <NoStoreState />;
-  }
 
   if (isLoading) {
     return (
