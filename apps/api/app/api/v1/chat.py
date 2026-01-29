@@ -135,7 +135,9 @@ async def list_conversations(
     db: DBSession,
     store: Store = Depends(get_store_by_id),
     session_id: str | None = Query(None, description="Session ID from widget"),
-    status_filter: ConversationStatus | None = Query(None, alias="status", description="Filter by status"),
+    status_filter: ConversationStatus | None = Query(
+        None, alias="status", description="Filter by status"
+    ),
     search: str | None = Query(None, description="Search by customer name or email"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -165,8 +167,7 @@ async def list_conversations(
 
     # Get paginated results
     query = (
-        base_query
-        .options(selectinload(Conversation.messages))
+        base_query.options(selectinload(Conversation.messages))
         .order_by(Conversation.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)

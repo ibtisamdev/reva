@@ -211,5 +211,3 @@ async def delete_store(
     # Soft delete - set is_active to False
     store.is_active = False
     await db.commit()
-
-

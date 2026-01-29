@@ -225,7 +225,9 @@ class KnowledgeService:
                 for chunk, embedding in zip(chunks, embeddings, strict=True):
                     chunk.embedding = embedding
                 await self.db.flush()
-                logger.info("Generated embeddings for %d chunks of article '%s'", len(chunks), data.title)
+                logger.info(
+                    "Generated embeddings for %d chunks of article '%s'", len(chunks), data.title
+                )
             except Exception:
                 logger.exception("Failed to generate embeddings for article '%s'", data.title)
 
