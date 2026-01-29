@@ -7,8 +7,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-logger = logging.getLogger(__name__)
-
 from app.models.knowledge import ContentType, KnowledgeArticle, KnowledgeChunk
 from app.schemas.knowledge import (
     KnowledgeArticleCreate,
@@ -16,6 +14,8 @@ from app.schemas.knowledge import (
     TextIngestionRequest,
 )
 from app.services.embedding_service import get_embedding_service
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeService:

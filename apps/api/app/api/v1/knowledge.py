@@ -5,9 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.core.deps import CurrentUser
-
-from app.core.deps import DBSession, get_user_organization_id
+from app.core.deps import CurrentUser, DBSession, get_user_organization_id
 from app.models.knowledge import ContentType
 from app.models.store import Store
 from app.schemas.common import PaginatedResponse

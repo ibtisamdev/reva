@@ -8,7 +8,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DBSession, OptionalUser, get_store_by_id
-from app.schemas.common import PaginatedResponse
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.store import Store
 from app.schemas.chat import (
@@ -18,6 +17,7 @@ from app.schemas.chat import (
     MessageResponse,
     SourceReference,
 )
+from app.schemas.common import PaginatedResponse
 from app.services.chat_service import ChatService
 
 router = APIRouter()
