@@ -141,7 +141,7 @@ async def list_conversations(
     search: str | None = Query(None, description="Search by customer name or email"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-):
+) -> PaginatedResponse[ConversationDetailResponse]:
     """List conversations for a store.
 
     When session_id is provided, returns conversations for that session (widget use).

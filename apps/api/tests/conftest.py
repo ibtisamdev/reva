@@ -1,5 +1,7 @@
 """Pytest configuration and fixtures."""
 
+from collections.abc import AsyncGenerator
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -7,7 +9,7 @@ from app.main import app
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
+async def client() -> AsyncGenerator[AsyncClient, None]:
     """Create an async test client."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
