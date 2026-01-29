@@ -147,13 +147,10 @@ export function useStore() {
 
 /**
  * Hook to get the currently selected store ID.
- * Throws if no store is selected (should be used in components wrapped by store guard).
+ * Returns null if no store is selected - pages should render NoStoreState in this case.
  */
-export function useRequiredStoreId(): string {
+export function useRequiredStoreId(): string | null {
   const { selectedStoreId } = useStore();
-  if (!selectedStoreId) {
-    throw new Error('No store selected. User should be redirected to onboarding.');
-  }
   return selectedStoreId;
 }
 

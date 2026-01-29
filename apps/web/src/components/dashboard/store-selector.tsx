@@ -65,7 +65,7 @@ export function StoreSelector() {
     );
   }
 
-  // Don't render if no stores (onboarding will show instead)
+  // Don't render if no stores - pages will show NoStoreState component instead
   if (stores.length === 0) {
     return null;
   }

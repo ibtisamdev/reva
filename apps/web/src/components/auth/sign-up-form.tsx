@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { signIn, signUp } from '@/lib/auth-client';
+import { organization, signIn, signUp } from '@/lib/auth-client';
 
 export function SignUpForm() {
   const router = useRouter();
@@ -42,6 +42,21 @@ export function SignUpForm() {
       if (result.error) {
         setError(result.error.message || 'Failed to create account');
         return;
+      }
+
+      // Create a default organization for the new user
+      const orgName = name ? `${name}'s Organization` : 'My Organization';
+      const orgResult = await organization.create({
+        name: orgName,
+        slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      });
+
+      if (orgResult.error) {
+        // Non-blocking - user can create org later
+        console.error('Failed to create organization:', orgResult.error);
+      } else if (orgResult.data) {
+        // Set the new organization as active
+        await organization.setActive({ organizationId: orgResult.data.id });
       }
 
       router.push('/dashboard');

@@ -79,7 +79,7 @@ class ChatService:
             query=request.message,
             store_id=store.id,
             top_k=5,
-            threshold=0.7,
+            threshold=0.5,
         )
 
         # Get conversation history
@@ -105,7 +105,7 @@ class ChatService:
             conversation_id=conversation.id,
             role=MessageRole.ASSISTANT,
             content=response_content,
-            sources=[s.model_dump() for s in sources],
+            sources=[s.model_dump(mode="json") for s in sources],
             tokens_used=tokens_used,
         )
 

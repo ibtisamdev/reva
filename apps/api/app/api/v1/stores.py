@@ -27,6 +27,69 @@ from app.schemas.store import (
 router = APIRouter()
 
 
+# === Store Settings Endpoints (must be before /{store_id} to avoid route conflicts) ===
+
+
+@router.get(
+    "/settings",
+    response_model=StoreSettingsResponse,
+    summary="Get store settings",
+    description="Get the widget and other settings for a store.",
+)
+async def get_store_settings(
+    store: Store = Depends(get_store_by_id),
+) -> StoreSettingsResponse:
+    """Get store settings including widget configuration."""
+    settings = store.settings or {}
+
+    # Merge with defaults
+    widget_settings = {
+        **DEFAULT_WIDGET_SETTINGS.get("widget", {}),
+        **settings.get("widget", {}),
+    }
+
+    return StoreSettingsResponse(
+        widget=WidgetSettings(**widget_settings),
+    )
+
+
+@router.patch(
+    "/settings",
+    response_model=StoreSettingsResponse,
+    summary="Update store settings",
+    description="Partially update store settings. Only provided fields will be updated.",
+)
+async def update_store_settings(
+    data: StoreSettingsUpdate,
+    db: DBSession,
+    store: Store = Depends(get_store_by_id),
+) -> StoreSettingsResponse:
+    """Update store settings."""
+    current_settings = store.settings or {}
+
+    # Update widget settings if provided
+    if data.widget:
+        current_widget = current_settings.get("widget", {})
+        update_data = data.widget.model_dump(exclude_unset=True)
+        current_widget.update(update_data)
+        current_settings["widget"] = current_widget
+
+    # Update the store
+    store.settings = current_settings
+    await db.commit()
+    await db.refresh(store)
+
+    # Return merged settings
+    widget_settings = {
+        **DEFAULT_WIDGET_SETTINGS.get("widget", {}),
+        **current_settings.get("widget", {}),
+    }
+
+    return StoreSettingsResponse(
+        widget=WidgetSettings(**widget_settings),
+    )
+
+
 # === Store CRUD Endpoints ===
 
 
@@ -43,11 +106,12 @@ async def list_stores(
     """List all stores for the user's organization."""
     org_id = get_user_organization_id(user)
 
-    # Get stores for the organization
+    # Get active stores for the organization
     query = (
         select(Store)
         .where(
             Store.organization_id == org_id,
+            Store.is_active == True,  # noqa: E712
         )
         .order_by(Store.created_at.desc())
     )
@@ -149,64 +213,3 @@ async def delete_store(
     await db.commit()
 
 
-# === Store Settings Endpoints ===
-
-
-@router.get(
-    "/settings",
-    response_model=StoreSettingsResponse,
-    summary="Get store settings",
-    description="Get the widget and other settings for a store.",
-)
-async def get_store_settings(
-    store: Store = Depends(get_store_by_id),
-) -> StoreSettingsResponse:
-    """Get store settings including widget configuration."""
-    settings = store.settings or {}
-
-    # Merge with defaults
-    widget_settings = {
-        **DEFAULT_WIDGET_SETTINGS.get("widget", {}),
-        **settings.get("widget", {}),
-    }
-
-    return StoreSettingsResponse(
-        widget=WidgetSettings(**widget_settings),
-    )
-
-
-@router.patch(
-    "/settings",
-    response_model=StoreSettingsResponse,
-    summary="Update store settings",
-    description="Partially update store settings. Only provided fields will be updated.",
-)
-async def update_store_settings(
-    data: StoreSettingsUpdate,
-    db: DBSession,
-    store: Store = Depends(get_store_by_id),
-) -> StoreSettingsResponse:
-    """Update store settings."""
-    current_settings = store.settings or {}
-
-    # Update widget settings if provided
-    if data.widget:
-        current_widget = current_settings.get("widget", {})
-        update_data = data.widget.model_dump(exclude_unset=True)
-        current_widget.update(update_data)
-        current_settings["widget"] = current_widget
-
-    # Update the store
-    store.settings = current_settings
-    await db.commit()
-    await db.refresh(store)
-
-    # Return merged settings
-    widget_settings = {
-        **DEFAULT_WIDGET_SETTINGS.get("widget", {}),
-        **current_settings.get("widget", {}),
-    }
-
-    return StoreSettingsResponse(
-        widget=WidgetSettings(**widget_settings),
-    )

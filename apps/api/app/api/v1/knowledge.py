@@ -5,7 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.core.deps import CurrentUser, DBSession
+from app.core.deps import CurrentUser
+
+from app.core.deps import DBSession, get_user_organization_id
 from app.models.knowledge import ContentType
 from app.models.store import Store
 from app.schemas.common import PaginatedResponse
@@ -27,18 +29,19 @@ router = APIRouter()
 
 async def get_store_for_user(
     store_id: UUID = Query(..., description="Store ID"),
-    _user: CurrentUser = None,  # type: ignore[assignment]  # Reserved for authorization
+    user: CurrentUser = None,  # type: ignore[assignment]
     db: DBSession = None,  # type: ignore[assignment]
 ) -> Store:
     """Get and validate store access for the authenticated user.
 
-    For now, we validate that the store exists and is active.
-    TODO: Add proper authorization check against user's organization membership
-          using _user's organization_id.
+    Validates that the store exists, is active, and belongs to the user's organization.
     """
+    org_id = get_user_organization_id(user)
+
     query = select(Store).where(
         Store.id == store_id,
         Store.is_active == True,  # noqa: E712
+        Store.organization_id == org_id,
     )
     result = await db.execute(query)
     store = result.scalar_one_or_none()
@@ -46,11 +49,8 @@ async def get_store_for_user(
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Store not found or inactive",
+            detail="Store not found or access denied",
         )
-
-    # TODO: Verify user has access to this store via organization_id
-    # For now, we trust the user has access if they're authenticated
 
     return store
 
@@ -246,6 +246,7 @@ async def update_knowledge_article(
         created_at=article.created_at,
         updated_at=article.updated_at,
     )
+
 
 
 @router.delete(

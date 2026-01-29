@@ -4,10 +4,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DBSession, OptionalUser, get_store_by_id
+from app.schemas.common import PaginatedResponse
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.store import Store
 from app.schemas.chat import (
@@ -127,33 +128,54 @@ async def get_conversation(
 
 @router.get(
     "/conversations",
-    response_model=list[ConversationDetailResponse],
-    summary="List conversations by session",
+    response_model=PaginatedResponse[ConversationDetailResponse],
+    summary="List conversations",
 )
-async def list_conversations_by_session(
+async def list_conversations(
     db: DBSession,
-    session_id: str = Query(..., description="Session ID from widget"),
     store: Store = Depends(get_store_by_id),
-) -> list[ConversationDetailResponse]:
-    """List conversations for a session.
+    session_id: str | None = Query(None, description="Session ID from widget"),
+    status_filter: ConversationStatus | None = Query(None, alias="status", description="Filter by status"),
+    search: str | None = Query(None, description="Search by customer name or email"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """List conversations for a store.
 
-    Used by the widget to restore previous conversations for a returning user.
+    When session_id is provided, returns conversations for that session (widget use).
+    Otherwise returns paginated conversations for the store (dashboard use).
     """
-    query = (
-        select(Conversation)
-        .where(
-            Conversation.store_id == store.id,
-            Conversation.session_id == session_id,
+    base_query = select(Conversation).where(Conversation.store_id == store.id)
+
+    if session_id:
+        base_query = base_query.where(Conversation.session_id == session_id)
+    if status_filter:
+        base_query = base_query.where(Conversation.status == status_filter)
+    if search:
+        # Escape LIKE special characters to prevent wildcard injection
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        base_query = base_query.where(
+            (Conversation.customer_name.ilike(f"%{escaped}%"))
+            | (Conversation.customer_email.ilike(f"%{escaped}%"))
         )
+
+    # Get total count
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total = (await db.execute(count_query)).scalar() or 0
+
+    # Get paginated results
+    query = (
+        base_query
         .options(selectinload(Conversation.messages))
         .order_by(Conversation.created_at.desc())
-        .limit(10)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
 
     result = await db.execute(query)
     conversations = result.scalars().all()
 
-    return [
+    items = [
         ConversationDetailResponse(
             id=c.id,
             store_id=c.store_id,
@@ -178,6 +200,16 @@ async def list_conversations_by_session(
         )
         for c in conversations
     ]
+
+    pages = (total + page_size - 1) // page_size if total > 0 else 1
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 # === Status Update Schema ===

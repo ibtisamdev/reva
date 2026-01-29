@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { organization, useSession } from '@/lib/auth-client';
 import { createStore, storeKeys } from '@/lib/api/stores';
 import { useStore } from '@/lib/store-context';
 
@@ -16,9 +17,35 @@ export function NoStoreState() {
   const [storeName, setStoreName] = useState('');
   const { selectStore, refreshStores } = useStore();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
 
   const createMutation = useMutation({
-    mutationFn: createStore,
+    mutationFn: async (name: string) => {
+      // Check if user has an active organization, create one if not
+      const activeOrg = await organization.getFullOrganization();
+
+      if (!activeOrg.data) {
+        // No active organization - create one
+        const userName = session?.user?.name || 'User';
+        const orgName = `${userName}'s Organization`;
+        const orgResult = await organization.create({
+          name: orgName,
+          slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        });
+
+        if (orgResult.error) {
+          throw new Error('Failed to create organization: ' + orgResult.error.message);
+        }
+
+        if (orgResult.data) {
+          // Set the new organization as active
+          await organization.setActive({ organizationId: orgResult.data.id });
+        }
+      }
+
+      // Now create the store
+      return createStore({ name });
+    },
     onSuccess: async (newStore) => {
       await queryClient.invalidateQueries({ queryKey: storeKeys.list() });
       await refreshStores();
@@ -35,7 +62,7 @@ export function NoStoreState() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (storeName.trim()) {
-      createMutation.mutate({ name: storeName.trim() });
+      createMutation.mutate(storeName.trim());
     }
   };
 

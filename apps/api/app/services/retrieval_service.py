@@ -36,7 +36,7 @@ class RetrievalService:
         query: str,
         store_id: UUID,
         top_k: int = 5,
-        threshold: float = 0.7,
+        threshold: float = 0.5,
     ) -> list[RetrievedChunk]:
         """Retrieve relevant chunks for a query.
 

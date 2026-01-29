@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { NoStoreState } from '@/components/dashboard/no-store-state';
 import { ColorPicker } from '@/components/widget/color-picker';
 import { WidgetPreview } from '@/components/widget/widget-preview';
 import { EmbedCode } from '@/components/widget/embed-code';
@@ -28,15 +29,16 @@ export default function WidgetSettingsPage() {
   const queryClient = useQueryClient();
   const storeId = useRequiredStoreId();
 
-  const { data: settings, isLoading } = useQuery({
-    queryKey: storeKeys.settings(storeId),
-    queryFn: () => getStoreSettings(storeId),
-  });
-
   // Local state for form
   const [formData, setFormData] = useState<WidgetSettings>(
     defaultWidgetSettings.widget
   );
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: storeKeys.settings(storeId ?? ''),
+    queryFn: () => getStoreSettings(storeId!),
+    enabled: !!storeId,
+  });
 
   // Sync form data when settings load
   useEffect(() => {
@@ -47,10 +49,10 @@ export default function WidgetSettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      updateStoreSettings(storeId, { widget: formData }),
+      updateStoreSettings(storeId!, { widget: formData }),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: storeKeys.settings(storeId),
+        queryKey: storeKeys.settings(storeId!),
       });
       toast.success('Widget settings saved');
     },
@@ -58,6 +60,11 @@ export default function WidgetSettingsPage() {
       toast.error('Failed to save settings');
     },
   });
+
+  // Show onboarding when no store is selected
+  if (!storeId) {
+    return <NoStoreState />;
+  }
 
   const handleSave = () => {
     updateMutation.mutate();

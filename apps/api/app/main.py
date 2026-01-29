@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -60,6 +60,11 @@ def create_app() -> FastAPI:
             status_code=500,
             content={"detail": "Internal server error"},
         )
+
+    # Redirect /docs to versioned docs URL
+    @app.get("/docs", include_in_schema=False)
+    async def docs_redirect() -> RedirectResponse:
+        return RedirectResponse(url=f"{settings.api_v1_prefix}/docs")
 
     # Root endpoint
     @app.get("/")

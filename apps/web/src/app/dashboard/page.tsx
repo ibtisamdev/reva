@@ -1,14 +1,29 @@
-import { headers } from 'next/headers';
+'use client';
+
+import { Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { auth } from '@/lib/auth';
+import { NoStoreState } from '@/components/dashboard/no-store-state';
+import { useStore } from '@/lib/store-context';
+import { useSession } from '@/lib/auth-client';
 
-export default async function DashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+export default function DashboardPage() {
+  const { isLoading: storeLoading, hasStores } = useStore();
+  const { data: session } = useSession();
 
   const userName = session?.user?.name || 'User';
+
+  if (storeLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!hasStores) {
+    return <NoStoreState />;
+  }
 
   return (
     <div className="space-y-6">
