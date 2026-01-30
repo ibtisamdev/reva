@@ -167,3 +167,53 @@ export interface StoreSettings {
 export interface UpdateStoreSettingsRequest {
   widget?: Partial<WidgetSettings>;
 }
+
+// === Shopify Integration ===
+
+export type IntegrationStatus = 'pending' | 'active' | 'disconnected' | 'error';
+
+export interface ShopifyConnection {
+  platform: string;
+  platform_domain: string;
+  status: IntegrationStatus;
+  last_synced_at: string | null;
+  product_count: number;
+}
+
+export interface SyncStatus {
+  status: string;
+  message: string;
+}
+
+// === Products ===
+
+export interface Product {
+  id: string;
+  platform_product_id: string;
+  title: string;
+  description: string | null;
+  handle: string;
+  vendor: string | null;
+  product_type: string | null;
+  status: string;
+  tags: string[];
+  variants: ProductVariant[];
+  images: ProductImage[];
+  synced_at: string | null;
+  created_at: string;
+}
+
+export interface ProductVariant {
+  id?: number | string;
+  title: string;
+  price: string;
+  sku: string | null;
+  inventory_quantity: number | null;
+}
+
+export interface ProductImage {
+  id?: number | string;
+  src: string;
+  alt: string | null;
+  position: number;
+}

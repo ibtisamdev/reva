@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # Shopify
     shopify_client_id: str = ""
     shopify_client_secret: str = ""
+    shopify_scopes: str = "read_products,read_content"
+    shopify_api_version: str = "2024-01"
+
+    # URLs
+    api_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:3000"
 
     # LLM APIs
     anthropic_api_key: str = ""

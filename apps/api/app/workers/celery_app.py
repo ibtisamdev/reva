@@ -12,9 +12,7 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.example",
         "app.workers.tasks.embedding",
-        # Future task modules:
-        # "app.workers.tasks.sync",
-        # "app.workers.tasks.recovery",
+        "app.workers.tasks.shopify",
     ],
 )
 
