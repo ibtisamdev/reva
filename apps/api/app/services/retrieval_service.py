@@ -220,11 +220,13 @@ class RetrievalService:
                 if isinstance(first, dict):
                     price = first.get("price")
 
-            products.append(RetrievedProduct(
-                product_id=row.product_id,
-                title=row.title,
-                description=row.description,
-                price=price,
-                similarity=row.similarity,
-            ))
+            products.append(
+                RetrievedProduct(
+                    product_id=row.product_id,
+                    title=row.title,
+                    description=row.description,
+                    price=price,
+                    similarity=row.similarity,
+                )
+            )
         return products

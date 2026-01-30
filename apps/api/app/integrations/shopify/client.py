@@ -43,7 +43,8 @@ class ShopifyClient:
         async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
             response = await client.get(f"{self.base_url}/pages.json?limit=250")
             response.raise_for_status()
-            return response.json().get("pages", [])
+            pages: list[dict[str, Any]] = response.json().get("pages", [])
+            return pages
 
     async def register_webhooks(self) -> None:
         """Register product webhooks for incremental sync."""
@@ -89,6 +90,6 @@ class ShopifyClient:
 
         for part in link_header.split(","):
             if 'rel="next"' in part:
-                url = part.split(";")[0].strip().strip("<>")
+                url: str = part.split(";")[0].strip().strip("<>")
                 return url
         return None

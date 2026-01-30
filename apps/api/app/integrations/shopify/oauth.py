@@ -44,12 +44,14 @@ def build_auth_url(shop: str, nonce: str) -> str:
         The full authorization URL to redirect the merchant to.
     """
     redirect_uri = f"{settings.api_url}/api/v1/shopify/callback"
-    params = urlencode({
-        "client_id": settings.shopify_client_id,
-        "scope": settings.shopify_scopes,
-        "redirect_uri": redirect_uri,
-        "state": nonce,
-    })
+    params = urlencode(
+        {
+            "client_id": settings.shopify_client_id,
+            "scope": settings.shopify_scopes,
+            "redirect_uri": redirect_uri,
+            "state": nonce,
+        }
+    )
     return f"https://{shop}/admin/oauth/authorize?{params}"
 
 
@@ -68,11 +70,15 @@ async def exchange_code_for_token(shop: str, code: str) -> str:
     """
     url = f"https://{shop}/admin/oauth/access_token"
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, json={
-            "client_id": settings.shopify_client_id,
-            "client_secret": settings.shopify_client_secret,
-            "code": code,
-        })
+        response = await client.post(
+            url,
+            json={
+                "client_id": settings.shopify_client_id,
+                "client_secret": settings.shopify_client_secret,
+                "code": code,
+            },
+        )
         response.raise_for_status()
         data = response.json()
-        return data["access_token"]
+        token: str = data["access_token"]
+        return token

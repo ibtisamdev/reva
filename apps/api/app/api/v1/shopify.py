@@ -32,9 +32,7 @@ INSTALL_TOKEN_TTL_SECONDS = 300  # 5 minutes
 def _sign_install_token(store_id: str, timestamp: int) -> str:
     """Create an HMAC signature for a store install request."""
     msg = f"{store_id}:{timestamp}"
-    return hmac_mod.new(
-        settings.secret_key.encode(), msg.encode(), hashlib.sha256
-    ).hexdigest()
+    return hmac_mod.new(settings.secret_key.encode(), msg.encode(), hashlib.sha256).hexdigest()
 
 
 @router.get("/install-url")
@@ -165,7 +163,9 @@ async def callback(
     # Trigger initial sync
     sync_products_full.delay(str(store_id))
 
-    return RedirectResponse(f"{settings.frontend_url}/dashboard/settings/integrations?connected=true")
+    return RedirectResponse(
+        f"{settings.frontend_url}/dashboard/settings/integrations?connected=true"
+    )
 
 
 @router.post("/disconnect")

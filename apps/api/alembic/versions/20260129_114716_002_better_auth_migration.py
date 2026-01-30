@@ -58,9 +58,17 @@ def upgrade() -> None:
     op.drop_index(op.f("ix_users_organization_id"), table_name="users")
     op.drop_table("users")
     # Drop foreign keys referencing organizations before dropping the table
-    op.drop_constraint(op.f("fk_products_organization_id_organizations"), "products", type_="foreignkey")
-    op.drop_constraint(op.f("fk_knowledge_articles_organization_id_organizations"), "knowledge_articles", type_="foreignkey")
-    op.drop_constraint(op.f("fk_conversations_organization_id_organizations"), "conversations", type_="foreignkey")
+    op.drop_constraint(
+        op.f("fk_products_organization_id_organizations"), "products", type_="foreignkey"
+    )
+    op.drop_constraint(
+        op.f("fk_knowledge_articles_organization_id_organizations"),
+        "knowledge_articles",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        op.f("fk_conversations_organization_id_organizations"), "conversations", type_="foreignkey"
+    )
     op.drop_index(op.f("ix_organizations_shopify_domain"), table_name="organizations")
     op.drop_table("organizations")
     op.alter_column(

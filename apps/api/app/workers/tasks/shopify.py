@@ -41,7 +41,8 @@ def product_to_text(product: Product) -> str:
                 parts.append(f"Price: ${price}")
 
         non_default = [
-            v.get("title", "") for v in product.variants
+            v.get("title", "")
+            for v in product.variants
             if isinstance(v, dict) and v.get("title") not in (None, "", "Default Title")
         ]
         if non_default:
@@ -79,7 +80,7 @@ def _map_shopify_product(store_id: UUID, data: dict[str, Any]) -> dict[str, Any]
     }
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="tasks.shopify.sync_products_full",
     base=BaseTask,
     bind=True,
@@ -106,7 +107,11 @@ async def _sync_products_full_async(store_id: UUID) -> dict[str, Any]:
         integration = result.scalar_one_or_none()
 
         if not integration or integration.status != IntegrationStatus.ACTIVE:
-            return {"store_id": str(store_id), "status": "skipped", "reason": "no active integration"}
+            return {
+                "store_id": str(store_id),
+                "status": "skipped",
+                "reason": "no active integration",
+            }
 
         try:
             access_token = decrypt_token(integration.credentials.get("access_token", ""))
@@ -155,7 +160,7 @@ async def _sync_products_full_async(store_id: UUID) -> dict[str, Any]:
     }
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="tasks.shopify.generate_product_embeddings",
     base=BaseTask,
     bind=True,
@@ -197,24 +202,26 @@ async def _generate_product_embeddings_async(store_id: UUID) -> dict[str, Any]:
     }
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="tasks.shopify.sync_single_product",
     base=BaseTask,
     bind=True,
 )
-def sync_single_product(self: BaseTask, store_id: str, shopify_product: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001
+def sync_single_product(
+    self: BaseTask, store_id: str, shopify_product: dict[str, Any]
+) -> dict[str, Any]:  # noqa: ARG001
     """Upsert a single product and generate its embedding."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(
-            _sync_single_product_async(UUID(store_id), shopify_product)
-        )
+        return loop.run_until_complete(_sync_single_product_async(UUID(store_id), shopify_product))
     finally:
         loop.close()
 
 
-async def _sync_single_product_async(store_id: UUID, shopify_data: dict[str, Any]) -> dict[str, Any]:
+async def _sync_single_product_async(
+    store_id: UUID, shopify_data: dict[str, Any]
+) -> dict[str, Any]:
     """Async implementation of single product sync."""
     embedding_service = get_embedding_service()
 
@@ -225,7 +232,9 @@ async def _sync_single_product_async(store_id: UUID, shopify_data: dict[str, Any
             .values(**values)
             .on_conflict_do_update(
                 index_elements=["store_id", "platform_product_id"],
-                set_={k: v for k, v in values.items() if k not in ("store_id", "platform_product_id")},
+                set_={
+                    k: v for k, v in values.items() if k not in ("store_id", "platform_product_id")
+                },
             )
             .returning(Product)
         )
