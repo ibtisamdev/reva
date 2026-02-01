@@ -208,9 +208,9 @@ async def _generate_product_embeddings_async(store_id: UUID) -> dict[str, Any]:
     bind=True,
 )
 def sync_single_product(
-    self: BaseTask,
+    self: BaseTask,  # noqa: ARG001
     store_id: str,
-    shopify_product: dict[str, Any],  # noqa: ARG001
+    shopify_product: dict[str, Any],
 ) -> dict[str, Any]:
     """Upsert a single product and generate its embedding."""
     loop = asyncio.new_event_loop()
