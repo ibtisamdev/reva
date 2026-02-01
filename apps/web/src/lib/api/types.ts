@@ -58,6 +58,12 @@ export interface CreateKnowledgeRequest {
   source_url?: string;
 }
 
+export interface CreateKnowledgeFromUrlRequest {
+  url: string;
+  title?: string;
+  content_type?: ContentType;
+}
+
 export interface UpdateKnowledgeRequest {
   title?: string;
   content?: string;

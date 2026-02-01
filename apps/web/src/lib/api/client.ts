@@ -6,7 +6,7 @@ import { getAuthToken } from '@/lib/auth-client';
 
 import type { ErrorResponse } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 /**
  * Get authorization headers for API requests.

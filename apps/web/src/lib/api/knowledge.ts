@@ -2,9 +2,12 @@
  * Knowledge Base API functions
  */
 
-import { apiDelete, apiGet, apiPatch, apiPost } from './client';
+import { getAuthToken } from '@/lib/auth-client';
+
+import { API_BASE_URL, apiDelete, apiGet, apiPatch, apiPost } from './client';
 import type {
   ContentType,
+  CreateKnowledgeFromUrlRequest,
   CreateKnowledgeRequest,
   IngestionResponse,
   KnowledgeArticle,
@@ -72,6 +75,44 @@ export async function deleteKnowledgeArticle(
   return apiDelete(`/api/v1/knowledge/${articleId}`, {
     params: { store_id: storeId },
   });
+}
+
+export async function createKnowledgeFromUrl(
+  storeId: string,
+  data: CreateKnowledgeFromUrlRequest
+): Promise<IngestionResponse> {
+  return apiPost<IngestionResponse>('/api/v1/knowledge/url', {
+    params: { store_id: storeId },
+    body: data,
+  });
+}
+
+export async function createKnowledgeFromPdf(
+  storeId: string,
+  formData: FormData
+): Promise<IngestionResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/knowledge/pdf`);
+  url.searchParams.append('store_id', storeId);
+
+  const token = await getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers,
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+    throw new Error(err.detail || `HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<IngestionResponse>;
 }
 
 // === Query Keys ===
