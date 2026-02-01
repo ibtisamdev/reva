@@ -80,6 +80,14 @@ class TextIngestionRequest(BaseSchema):
     source_url: HttpUrl | None = None
 
 
+class UrlIngestionRequest(BaseSchema):
+    """Request for URL ingestion."""
+
+    url: HttpUrl
+    title: str | None = Field(default=None, max_length=500)
+    content_type: ContentType = ContentType.PAGE
+
+
 class IngestionResponse(BaseSchema):
     """Response after ingestion."""
 

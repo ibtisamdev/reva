@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DBSession, get_user_organization_id
@@ -16,10 +16,48 @@ from app.schemas.knowledge import (
     KnowledgeArticleUpdate,
     KnowledgeChunkResponse,
     TextIngestionRequest,
+    UrlIngestionRequest,
 )
 from app.services.knowledge_service import KnowledgeService
 
 router = APIRouter()
+
+
+# === Helpers ===
+
+
+async def _ingest_and_respond(
+    db: DBSession,
+    store: Store,
+    ingestion_data: TextIngestionRequest,
+    success_message: str,
+) -> IngestionResponse:
+    """Shared ingestion logic: count tokens, ingest, dispatch background task if large."""
+    service = KnowledgeService(db)
+    token_count = service.embedding_service.count_tokens(ingestion_data.content)
+    is_large = token_count > 5000
+
+    article = await service.ingest_text(
+        store_id=store.id,
+        data=ingestion_data,
+        process_sync=not is_large,
+    )
+    await db.commit()
+
+    if is_large:
+        from app.workers.tasks.embedding import process_article_embeddings
+
+        process_article_embeddings.delay(str(article.id))
+
+    chunks_count = len(article.chunks) if article.chunks else 0
+
+    return IngestionResponse(
+        article_id=article.id,
+        title=article.title,
+        chunks_count=chunks_count,
+        status="processing" if is_large else "completed",
+        message="Document queued for processing" if is_large else success_message,
+    )
 
 
 # === Dependencies ===
@@ -79,38 +117,97 @@ async def ingest_knowledge(
     store: Store = Depends(get_store_for_user),
 ) -> IngestionResponse:
     """Ingest a text document into the knowledge base."""
-    service = KnowledgeService(db)
+    return await _ingest_and_respond(db, store, data, "Document ingested successfully")
 
-    # Check document size (rough estimate)
-    token_count = service.embedding_service.count_tokens(data.content)
-    is_large = token_count > 5000  # ~10 chunks
 
-    article = await service.ingest_text(
-        store_id=store.id,
-        data=data,
-        process_sync=not is_large,
+@router.post(
+    "/url",
+    response_model=IngestionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest content from a URL",
+)
+async def ingest_from_url(
+    data: UrlIngestionRequest,
+    db: DBSession,
+    store: Store = Depends(get_store_for_user),
+) -> IngestionResponse:
+    """Fetch a URL, extract its text content, and ingest it into the knowledge base."""
+    from app.services.url_service import fetch_url_content
+
+    try:
+        text, page_title = await fetch_url_content(str(data.url))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to fetch URL: {exc}",
+        ) from exc
+
+    ingestion_data = TextIngestionRequest(
+        title=data.title or page_title,
+        content=text,
+        content_type=data.content_type,
+        source_url=data.url,
     )
 
-    await db.commit()
+    return await _ingest_and_respond(db, store, ingestion_data, "URL content ingested successfully")
 
-    # If large, trigger async processing
-    if is_large:
-        # Import here to avoid circular imports
-        from app.workers.tasks.embedding import process_article_embeddings
 
-        process_article_embeddings.delay(str(article.id))
+@router.post(
+    "/pdf",
+    response_model=IngestionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest content from a PDF file",
+)
+async def ingest_from_pdf(
+    db: DBSession,
+    store: Store = Depends(get_store_for_user),
+    file: UploadFile = File(..., description="PDF file to ingest"),
+    title: str | None = Form(default=None, description="Optional title override"),
+    content_type: ContentType = Form(default=ContentType.GUIDE, description="Content type"),
+) -> IngestionResponse:
+    """Upload a PDF file, extract its text, and ingest it into the knowledge base."""
+    from app.services.pdf_service import extract_text_from_pdf
 
-    chunks_count = len(article.chunks) if article.chunks else 0
+    if file.content_type not in ("application/pdf", "application/x-pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF files are accepted.",
+        )
 
-    return IngestionResponse(
-        article_id=article.id,
-        title=article.title,
-        chunks_count=chunks_count,
-        status="processing" if is_large else "completed",
-        message=(
-            "Document queued for processing" if is_large else "Document ingested successfully"
-        ),
+    max_size = 10 * 1024 * 1024  # 10 MB
+
+    # Early size check before reading the full file into memory
+    if file.size is not None and file.size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 10 MB limit.",
+        )
+
+    contents = await file.read()
+    if len(contents) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 10 MB limit.",
+        )
+
+    try:
+        text = extract_text_from_pdf(contents)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to extract text from PDF: {exc}",
+        ) from exc
+
+    # Use filename (minus extension) as default title
+    default_title = (file.filename or "Uploaded PDF").rsplit(".", 1)[0]
+
+    ingestion_data = TextIngestionRequest(
+        title=title or default_title,
+        content=text,
+        content_type=content_type,
     )
+
+    return await _ingest_and_respond(db, store, ingestion_data, "PDF ingested successfully")
 
 
 @router.get(
