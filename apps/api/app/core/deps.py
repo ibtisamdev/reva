@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
+import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.core.auth import (
     get_current_user,
     get_optional_user,
 )
+from app.core.config import settings
 from app.core.database import get_async_session
 
 if TYPE_CHECKING:
@@ -28,6 +30,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Alias for get_async_session for backwards compatibility."""
     async for session in get_async_session():
         yield session
+
+
+# Shared Redis connection pool
+_redis_pool: aioredis.ConnectionPool | None = None
+
+
+def _get_redis_pool() -> aioredis.ConnectionPool:
+    global _redis_pool  # noqa: PLW0603
+    if _redis_pool is None:
+        _redis_pool = aioredis.ConnectionPool.from_url(
+            str(settings.redis_url), decode_responses=True
+        )
+    return _redis_pool
+
+
+async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+    """Yield a Redis client from the shared connection pool."""
+    pool = _get_redis_pool()
+    r = aioredis.Redis(connection_pool=pool)
+    try:
+        yield r
+    finally:
+        await r.aclose()
 
 
 # Database session dependency
@@ -113,6 +138,7 @@ __all__ = [
     "get_db",
     "get_optional_user",
     "get_store_by_id",
+    "get_redis",
     "get_store_for_user",
     "get_user_organization_id",
 ]

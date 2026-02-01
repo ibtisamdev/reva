@@ -52,7 +52,7 @@ def upgrade() -> None:
         sa.Column(
             "platform",
             sa.Enum(
-                "SHOPIFY", "WOOCOMMERCE", "BIGCOMMERCE", "MAGENTO", "CUSTOM", name="platform_type"
+                "shopify", "woocommerce", "bigcommerce", "magento", "custom", name="platform_type"
             ),
             nullable=False,
         ),
@@ -61,7 +61,7 @@ def upgrade() -> None:
         sa.Column("credentials", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("PENDING", "ACTIVE", "DISCONNECTED", "ERROR", name="integration_status"),
+            sa.Enum("pending", "active", "disconnected", "error", name="integration_status"),
             nullable=False,
         ),
         sa.Column("status_message", sa.Text(), nullable=True),

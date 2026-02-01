@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Home, MessageSquare, Settings } from 'lucide-react';
+import { BookOpen, Home, MessageSquare, Plug, Settings, ShoppingBag } from 'lucide-react';
 
 import { StoreSelector } from '@/components/dashboard/store-selector';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,9 @@ import { cn } from '@/lib/utils';
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: Home },
   { name: 'Conversations', href: '/dashboard/conversations', icon: MessageSquare },
+  { name: 'Products', href: '/dashboard/products', icon: ShoppingBag },
   { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },
+  { name: 'Integrations', href: '/dashboard/settings/integrations', icon: Plug },
   { name: 'Widget Settings', href: '/dashboard/settings/widget', icon: Settings },
 ];
 

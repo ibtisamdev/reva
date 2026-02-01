@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge import KnowledgeArticle, KnowledgeChunk
+from app.models.product import Product
 from app.services.embedding_service import get_embedding_service
 
 
@@ -22,6 +23,17 @@ class RetrievedChunk:
     # Article metadata
     article_title: str
     article_url: str | None
+
+
+@dataclass
+class RetrievedProduct:
+    """A product retrieved from vector search."""
+
+    product_id: UUID
+    title: str
+    description: str | None
+    price: str | None
+    similarity: float
 
 
 class RetrievalService:
@@ -158,3 +170,63 @@ class RetrievalService:
             )
             for row in rows
         ]
+
+    async def retrieve_products(
+        self,
+        query: str,
+        store_id: UUID,
+        top_k: int = 3,
+        threshold: float = 0.5,
+    ) -> list[RetrievedProduct]:
+        """Retrieve relevant products for a query using vector similarity.
+
+        Args:
+            query: The user's question
+            store_id: Filter to this store only
+            top_k: Maximum number of products to return
+            threshold: Minimum similarity score
+
+        Returns:
+            List of retrieved products sorted by relevance
+        """
+        query_embedding = await self.embedding_service.generate_embedding(query)
+        max_distance = 1 - threshold
+
+        stmt = (
+            select(
+                Product.id.label("product_id"),
+                Product.title,
+                Product.description,
+                Product.variants,
+                (1 - Product.embedding.cosine_distance(query_embedding)).label("similarity"),
+            )
+            .where(
+                Product.store_id == store_id,
+                Product.embedding.isnot(None),
+                Product.embedding.cosine_distance(query_embedding) <= max_distance,
+            )
+            .order_by(Product.embedding.cosine_distance(query_embedding))
+            .limit(top_k)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.fetchall()
+
+        products: list[RetrievedProduct] = []
+        for row in rows:
+            price = None
+            if row.variants and isinstance(row.variants, list) and row.variants:
+                first = row.variants[0]
+                if isinstance(first, dict):
+                    price = first.get("price")
+
+            products.append(
+                RetrievedProduct(
+                    product_id=row.product_id,
+                    title=row.title,
+                    description=row.description,
+                    price=price,
+                    similarity=row.similarity,
+                )
+            )
+        return products

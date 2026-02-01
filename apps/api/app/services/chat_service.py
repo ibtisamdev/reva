@@ -19,7 +19,7 @@ from app.models.message import Message, MessageRole
 from app.models.store import Store
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.citation_service import CitationService
-from app.services.retrieval_service import RetrievalService, RetrievedChunk
+from app.services.retrieval_service import RetrievalService, RetrievedChunk, RetrievedProduct
 
 # Constants
 CHAT_MODEL = "gpt-4o"
@@ -74,11 +74,18 @@ class ChatService:
             content=request.message,
         )
 
-        # Retrieve relevant context
+        # Retrieve relevant context (knowledge + products)
         chunks = await self.retrieval_service.retrieve_context(
             query=request.message,
             store_id=store.id,
             top_k=5,
+            threshold=0.5,
+        )
+
+        products = await self.retrieval_service.retrieve_products(
+            query=request.message,
+            store_id=store.id,
+            top_k=3,
             threshold=0.5,
         )
 
@@ -95,6 +102,7 @@ class ChatService:
             user_message=request.message,
             context_chunks=chunks,
             conversation_history=history,
+            product_context=products,
         )
 
         # Create sources from chunks
@@ -223,6 +231,7 @@ class ChatService:
         user_message: str,
         context_chunks: list[RetrievedChunk],
         conversation_history: list[Message],
+        product_context: list[RetrievedProduct] | None = None,
     ) -> tuple[str, int]:
         """Generate AI response using OpenAI.
 
@@ -236,7 +245,7 @@ class ChatService:
             Tuple of (response_content, tokens_used)
         """
         # Build system prompt
-        system_prompt = self._build_system_prompt(store_name, context_chunks)
+        system_prompt = self._build_system_prompt(store_name, context_chunks, product_context or [])
 
         # Build messages for API
         messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
@@ -274,17 +283,28 @@ class ChatService:
         self,
         store_name: str,
         context_chunks: list[RetrievedChunk],
+        product_context: list[RetrievedProduct] | None = None,
     ) -> str:
         """Build the system prompt with context.
 
         Args:
             store_name: Name of the store
             context_chunks: Retrieved context chunks
+            product_context: Retrieved product matches
 
         Returns:
             Complete system prompt string
         """
         context_text = self.citation_service.format_context_for_prompt(context_chunks)
+
+        product_text = ""
+        if product_context:
+            product_parts = []
+            for i, p in enumerate(product_context, 1):
+                desc = (p.description or "")[:200]
+                price_str = f" - Price: ${p.price}" if p.price else ""
+                product_parts.append(f"[P{i}] {p.title}{price_str}\n{desc}")
+            product_text = "\n\n".join(product_parts)
 
         return f"""You are a helpful customer support agent for {store_name}.
 
@@ -300,5 +320,8 @@ INSTRUCTIONS:
 
 CONTEXT FROM KNOWLEDGE BASE:
 {context_text}
+
+PRODUCT INFORMATION:
+{product_text or "No matching products found."}
 
 Remember: Only answer based on the context provided. If you're unsure, ask for clarification or direct the customer to contact support."""

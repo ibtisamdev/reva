@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import chat, health, knowledge, stores
+from app.api.v1 import chat, health, knowledge, products, shopify, stores
+from app.api.v1.webhooks import shopify as shopify_webhooks
 
 api_router = APIRouter()
 
@@ -30,6 +31,23 @@ api_router.include_router(
     tags=["stores"],
 )
 
-# Future routes will be added here:
-# api_router.include_router(shopify.router, prefix="/shopify", tags=["shopify"])
-# api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
+# Shopify OAuth and management
+api_router.include_router(
+    shopify.router,
+    prefix="/shopify",
+    tags=["shopify"],
+)
+
+# Shopify webhooks (no auth - verified via HMAC)
+api_router.include_router(
+    shopify_webhooks.router,
+    prefix="/webhooks/shopify",
+    tags=["webhooks"],
+)
+
+# Products
+api_router.include_router(
+    products.router,
+    prefix="/products",
+    tags=["products"],
+)
