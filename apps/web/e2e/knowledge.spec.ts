@@ -81,7 +81,7 @@ test.describe('Knowledge Base', () => {
     // Wait for the POST request to complete
     await page.waitForResponse((r) => r.url().includes('/api/v1/knowledge') && r.request().method() === 'POST');
     expect(postBody).not.toBeNull();
-    expect((postBody as Record<string, unknown>).title).toBe('New FAQ Article');
+    expect((postBody as unknown as Record<string, unknown>).title).toBe('New FAQ Article');
   });
 
   test('delete article with confirmation removes it from list', async ({ mockApi: page }) => {

@@ -121,7 +121,7 @@ test.describe('Dashboard', () => {
     await page.getByRole('button', { name: /create store/i }).click();
 
     await expect.poll(() => postBody).not.toBeNull();
-    expect((postBody as Record<string, unknown>).name).toBe('My New Store');
+    expect((postBody as unknown as Record<string, unknown>).name).toBe('My New Store');
   });
 
   test('switching stores refreshes data', async ({ mockApi: page }) => {
