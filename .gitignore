@@ -48,6 +48,9 @@ pnpm-debug.log*
 
 # Testing
 coverage
+.auth
+playwright-report
+test-results
 
 # Misc
 *.pem
