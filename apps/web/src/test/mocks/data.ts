@@ -4,7 +4,7 @@ import type {
   Message,
   KnowledgeArticle,
   KnowledgeArticleDetail,
-  SourceReference,
+
   Store,
   WidgetSettings,
   StoreSettings,

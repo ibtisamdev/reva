@@ -1,9 +1,6 @@
-import { render, screen, waitFor } from '@/test/utils';
+import { render, screen } from '@/test/utils';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-
-import { server } from '@/test/mocks/server';
-import { http, HttpResponse } from 'msw';
 
 const mockSelectStore = vi.fn();
 const mockRefreshStores = vi.fn();
