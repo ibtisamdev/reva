@@ -48,6 +48,7 @@ async def _reject_if_duplicate(db: DBSession, store_id: UUID, content: str) -> N
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Duplicate content already exists as article {existing.id}",
         )
+    return None
 
 
 async def _ingest_and_respond(
