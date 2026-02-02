@@ -35,7 +35,7 @@ export function ConversationList({ storeId }: ConversationListProps) {
   };
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
-    queryKey: conversationKeys.list(storeId, filters),
+    queryKey: [...conversationKeys.list(storeId, filters), page],
     queryFn: () =>
       getConversations(storeId, {
         status: filters.status,

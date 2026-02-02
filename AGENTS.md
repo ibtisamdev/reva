@@ -33,6 +33,78 @@ pnpm lint        # Lint all apps
 pnpm format      # Format code
 ```
 
+## Running the Project
+
+### Prerequisites
+
+- Node.js >= 20
+- Python >= 3.12
+- pnpm 9.1.0
+- uv (Python package manager)
+- Docker & Docker Compose
+
+### Infrastructure
+
+```bash
+docker-compose up -d
+```
+
+This starts:
+- **Postgres** (pgvector/pg16) on port 5432 — creates `reva` database (init script also creates `reva_auth`)
+- **Redis** (7-alpine) on port 6379
+
+### Environment Setup
+
+Copy `.env.example` files in three locations:
+
+```bash
+cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+Key variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_DATABASE_URL`, `BETTER_AUTH_SECRET`, API keys.
+
+Generate secrets with: `openssl rand -base64 32`
+
+### Install & Migrate
+
+```bash
+pnpm install                                    # Node dependencies (from root)
+cd apps/api && uv sync                          # Python dependencies
+cd apps/api && uv run alembic upgrade head      # Run database migrations
+```
+
+### Running
+
+```bash
+pnpm dev          # Starts all apps via Turborepo (+ Celery worker)
+```
+
+Individual apps:
+- API: `cd apps/api && uv run uvicorn app.main:app --reload --port 8000`
+- Web: `cd apps/web && pnpm dev`
+- Widget: `cd apps/widget && pnpm dev`
+- Worker: `cd apps/api && uv run celery -A app.workers.celery_app worker --loglevel=info`
+
+### Testing
+
+```bash
+cd apps/api && uv run pytest                    # API tests
+cd apps/web && pnpm test                        # Web unit tests (Vitest)
+cd apps/web && pnpm test:e2e                    # Web E2E (Playwright, needs dev server)
+cd apps/widget && npx playwright test           # Widget E2E (needs dev server)
+```
+
+### Development URLs
+
+| App    | URL                                  |
+|--------|--------------------------------------|
+| Web    | http://localhost:3000                |
+| API    | http://localhost:8000                |
+| API Docs | http://localhost:8000/api/v1/docs |
+| Widget | http://localhost:5173                |
+
 ## Critical Rules
 
 ### Database Migrations
