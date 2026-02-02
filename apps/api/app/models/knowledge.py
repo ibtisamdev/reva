@@ -50,6 +50,9 @@ class KnowledgeArticle(Base):
         nullable=False,
     )
 
+    # Duplicate detection
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
     # Source tracking (for synced content)
     source_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
