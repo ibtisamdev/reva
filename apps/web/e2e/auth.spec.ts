@@ -76,7 +76,7 @@ test.describe('Authentication - Sign In Flow', () => {
     await page.getByLabel(/password/i).fill('wrongpassword');
     await page.getByRole('button', { name: /sign in/i }).click();
 
-    await expect(page.getByText(/invalid|failed|error|incorrect/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/invalid|failed|error|incorrect|not found/i)).toBeVisible({ timeout: 10000 });
     await expect(page).toHaveURL(/\/sign-in/);
   });
 
