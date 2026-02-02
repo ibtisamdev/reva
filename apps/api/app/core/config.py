@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Environment
     environment: Literal["development", "staging", "production"] = "development"
-    debug: bool = True
+    debug: bool = False
 
     # API
     api_v1_prefix: str = "/api/v1"
@@ -57,6 +57,13 @@ class Settings(BaseSettings):
 
     # Authentication (Better Auth)
     auth_url: str = "http://localhost:3000"  # Next.js app URL where Better Auth runs
+
+    # Error tracking (GlitchTip/Sentry)
+    sentry_dsn: str = ""
+
+    # Database pool
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     # CORS
     cors_origins: list[str] = [

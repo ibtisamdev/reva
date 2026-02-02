@@ -24,6 +24,10 @@ dependencies = [
     "openai>=1.59.0",
     "tiktoken>=0.8.0",
     "pypdf>=5.0.0",
+    # Production hardening
+    "slowapi>=0.1.9",
+    "sentry-sdk[fastapi]>=2.0.0",
+    "python-json-logger>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -86,6 +90,9 @@ module = [
     "celery.*",
     "redis.*",
     "pgvector.*",
+    "slowapi.*",
+    "sentry_sdk.*",
+    "pythonjsonlogger.*",
 ]
 ignore_missing_imports = true
 

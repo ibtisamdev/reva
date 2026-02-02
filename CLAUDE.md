@@ -41,3 +41,9 @@ get-reva/                   # Monorepo root (Turborepo + pnpm workspaces)
 - **Components**: shadcn/ui from `@/components/ui/`
 - **Client components**: Add `'use client'` directive
 - **Service layer**: Business logic goes in `services/`, not route handlers
+
+## Deployment
+
+- **Architecture**: Vercel (dashboard) + VPS via Cloudflare Tunnel (API + worker) + Cloudflare Pages (widget)
+- **Key files**: `docker-compose.prod.yml`, `.github/workflows/ci.yml`, `docker/postgres/init-prod.sql`
+- See **[AGENTS.md](./AGENTS.md)** for full deployment details
