@@ -50,7 +50,7 @@ class Conversation(Base):
     )
 
     # Customer information (optional - can be anonymous)
-    customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Session tracking

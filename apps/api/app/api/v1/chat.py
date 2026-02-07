@@ -2,12 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DBSession, OptionalUser, get_store_by_id
+from app.core.rate_limit import limiter
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.store import Store
 from app.schemas.chat import (
@@ -44,7 +45,9 @@ router = APIRouter()
     relevant information from the store's knowledge base.
     """,
 )
+@limiter.limit("10/minute")
 async def send_message(
+    http_request: Request,  # noqa: ARG001 — required by slowapi
     request: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),

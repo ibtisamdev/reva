@@ -219,6 +219,51 @@ class ProductService:
 - `*Update` - partial (optional fields)
 - `*Response` - API response with `from_attributes=True`
 
+## Deployment
+
+### Production Architecture
+
+```
+app.reva.app    → Vercel          (Next.js dashboard)
+api.reva.app    → VPS via CF Tunnel (FastAPI + Celery worker)
+widget.reva.app → Cloudflare Pages (Preact widget)
+errors.reva.app → VPS via CF Tunnel (GlitchTip)
+```
+
+### Infrastructure
+
+Single VPS running Docker Compose with these services:
+
+- **postgres** — PostgreSQL with pgvector
+- **redis** — Task queue and caching
+- **api** — FastAPI application
+- **worker** — Celery worker
+- **cloudflared** — Cloudflare Tunnel for `api.reva.app` and `errors.reva.app`
+- **glitchtip** + **glitchtip-worker** — Error tracking
+
+### CI/CD
+
+Push to `main` triggers: lint → test → build → parallel deploy (API via SSH, widget via Cloudflare Pages). The dashboard auto-deploys via Vercel.
+
+### Key Files
+
+- `docker-compose.prod.yml` — Production Docker Compose stack
+- `.github/workflows/ci.yml` — CI/CD pipeline
+- `docker/postgres/init-prod.sql` — Production database init
+
+### Environment Variables
+
+- **VPS**: `.env.production` with all runtime secrets
+- **CI**: GitHub Secrets for deploy credentials and build-time vars
+- **Dashboard**: Vercel environment variables
+
+### Production Hardening
+
+- Rate limiting (per-IP and per-store)
+- Structured JSON logging with request IDs
+- Sentry/GlitchTip error tracking
+- Celery task time limits
+
 ## Testing
 
 pytest with async support. Run tests before committing:
