@@ -1,5 +1,6 @@
 """Knowledge management service for articles and chunks."""
 
+import hashlib
 import logging
 from uuid import UUID
 
@@ -24,6 +25,15 @@ class KnowledgeService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.embedding_service = get_embedding_service()
+
+    async def check_duplicate(self, store_id: UUID, content_hash: str) -> KnowledgeArticle | None:
+        """Check if an article with the same content hash exists for this store."""
+        query = select(KnowledgeArticle).where(
+            KnowledgeArticle.store_id == store_id,
+            KnowledgeArticle.content_hash == content_hash,
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
 
     # === Article CRUD ===
 
@@ -190,11 +200,13 @@ class KnowledgeService:
             The created article with chunks
         """
         # Create article
+        content_hash = hashlib.sha256(data.content.encode()).hexdigest()
         article = KnowledgeArticle(
             store_id=store_id,
             title=data.title,
             content=data.content,
             content_type=data.content_type,
+            content_hash=content_hash,
             source_url=str(data.source_url) if data.source_url else None,
         )
         self.db.add(article)

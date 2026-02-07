@@ -1,11 +1,24 @@
 """Knowledge management API endpoints."""
 
+import hashlib
+from typing import Never
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DBSession, get_user_organization_id
+from app.core.rate_limit import limiter
 from app.models.knowledge import ContentType
 from app.models.store import Store
 from app.schemas.common import PaginatedResponse
@@ -24,6 +37,18 @@ router = APIRouter()
 
 
 # === Helpers ===
+
+
+async def _reject_if_duplicate(db: DBSession, store_id: UUID, content: str) -> None | Never:
+    """Hash content and raise 409 if a duplicate article already exists."""
+    content_hash = hashlib.sha256(content.encode()).hexdigest()
+    existing = await KnowledgeService(db).check_duplicate(store_id, content_hash)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Duplicate content already exists as article {existing.id}",
+        )
+    return None
 
 
 async def _ingest_and_respond(
@@ -111,12 +136,15 @@ async def get_store_for_user(
     For larger documents, processing happens asynchronously via background task.
     """,
 )
+@limiter.limit("20/minute")
 async def ingest_knowledge(
+    request: Request,  # noqa: ARG001 — required by slowapi
     data: TextIngestionRequest,
     db: DBSession,
     store: Store = Depends(get_store_for_user),
 ) -> IngestionResponse:
     """Ingest a text document into the knowledge base."""
+    await _reject_if_duplicate(db, store.id, data.content)
     return await _ingest_and_respond(db, store, data, "Document ingested successfully")
 
 
@@ -126,7 +154,9 @@ async def ingest_knowledge(
     status_code=status.HTTP_201_CREATED,
     summary="Ingest content from a URL",
 )
+@limiter.limit("20/minute")
 async def ingest_from_url(
+    request: Request,  # noqa: ARG001 — required by slowapi
     data: UrlIngestionRequest,
     db: DBSession,
     store: Store = Depends(get_store_for_user),
@@ -141,6 +171,8 @@ async def ingest_from_url(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to fetch URL: {exc}",
         ) from exc
+
+    await _reject_if_duplicate(db, store.id, text)
 
     ingestion_data = TextIngestionRequest(
         title=data.title or page_title,
@@ -158,7 +190,9 @@ async def ingest_from_url(
     status_code=status.HTTP_201_CREATED,
     summary="Ingest content from a PDF file",
 )
+@limiter.limit("20/minute")
 async def ingest_from_pdf(
+    request: Request,  # noqa: ARG001 — required by slowapi
     db: DBSession,
     store: Store = Depends(get_store_for_user),
     file: UploadFile = File(..., description="PDF file to ingest"),
@@ -197,6 +231,8 @@ async def ingest_from_pdf(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to extract text from PDF: {exc}",
         ) from exc
+
+    await _reject_if_duplicate(db, store.id, text)
 
     # Use filename (minus extension) as default title
     default_title = (file.filename or "Uploaded PDF").rsplit(".", 1)[0]

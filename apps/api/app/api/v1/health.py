@@ -1,5 +1,6 @@
 """Health check endpoints."""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.deps import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
 
@@ -32,9 +35,10 @@ async def health_check(
     try:
         await db.execute(text("SELECT 1"))
         health_status["checks"]["database"] = "healthy"
-    except Exception as e:
+    except Exception:
+        logger.exception("Health check: database unhealthy")
         health_status["status"] = "unhealthy"
-        health_status["checks"]["database"] = f"unhealthy: {str(e)}"
+        health_status["checks"]["database"] = "unhealthy"
 
     # Check Redis connection
     try:
@@ -44,9 +48,10 @@ async def health_check(
         await redis_client.ping()
         await redis_client.close()
         health_status["checks"]["redis"] = "healthy"
-    except Exception as e:
+    except Exception:
+        logger.exception("Health check: redis unhealthy")
         health_status["status"] = "unhealthy"
-        health_status["checks"]["redis"] = f"unhealthy: {str(e)}"
+        health_status["checks"]["redis"] = "unhealthy"
 
     return health_status
 
