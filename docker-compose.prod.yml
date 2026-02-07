@@ -19,11 +19,16 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,68 +37,41 @@ services:
   api:
     build: ./apps/api
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     env_file: .env.production
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   worker:
     build: ./apps/api
     restart: unless-stopped
-    command: celery -A app.workers.celery_app worker --loglevel=info
+    command: celery -A app.workers.celery_app worker --loglevel=info -Q default,sync,recovery --concurrency=4
     env_file: .env.production
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
-  # --- Cloudflare Tunnel ---
-  cloudflared:
-    image: cloudflare/cloudflared:latest
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
     restart: unless-stopped
-    command: tunnel run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      api: { condition: service_healthy }
-      glitchtip: { condition: service_started }
-
-  # --- GlitchTip (error tracking) ---
-  # NOTE: GlitchTip shares the same Postgres & Redis instance as the app to
-  # keep the single-VPS setup simple. GlitchTip uses redis db 1 while the app
-  # uses db 0 (default). Accept this tradeoff until traffic justifies separate infra.
-  glitchtip:
-    image: glitchtip/glitchtip
-    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env.production
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/glitchtip
-      REDIS_URL: redis://redis:6379/1
-      SECRET_KEY: ${GLITCHTIP_SECRET_KEY}
-      PORT: 8080
-      EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
-      GLITCHTIP_DOMAIN: https://errors.${DOMAIN:-reva.app}
-      DEFAULT_FROM_EMAIL: errors@${DOMAIN:-reva.app}
-      CELERY_WORKER_AUTOSCALE: "1,3"
-      CELERY_WORKER_MAX_TASKS_PER_CHILD: 10000
-
-  glitchtip-worker:
-    image: glitchtip/glitchtip
-    restart: unless-stopped
-    command: ./bin/run-celery-with-beat.sh
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/glitchtip
-      REDIS_URL: redis://redis:6379/1
-      SECRET_KEY: ${GLITCHTIP_SECRET_KEY}
 
 volumes:
   postgres_data:
