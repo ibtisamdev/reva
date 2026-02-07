@@ -9,10 +9,15 @@ WORKDIR /app
 
 # Copy dependency files
 COPY pyproject.toml .
+COPY uv.lock .
 COPY .python-version .
 
-# Install dependencies
+# Install dependencies (cacheable layer)
 RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy application code and sync project
+COPY . .
+RUN uv sync --frozen --no-dev
 
 # Production stage
 FROM python:3.12-slim
@@ -40,5 +45,9 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Default command (API server)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live').read()"
+
+# Default command (API server with 2 workers for production)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
