@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file: .env.production
+    env_file: .env
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -54,7 +54,7 @@ services:
     build: ./apps/api
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info -Q default,sync,recovery --concurrency=4
-    env_file: .env.production
+    env_file: .env
     healthcheck:
       disable: true
     depends_on:
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file: .env.production
+    env_file: .env
     depends_on:
       postgres: { condition: service_healthy }
 
