@@ -7,7 +7,13 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import DBSession, OptionalUser, get_store_by_id
+from app.core.deps import (
+    CurrentUser,
+    DBSession,
+    OptionalUser,
+    get_store_by_id,
+    get_user_organization_id,
+)
 from app.core.rate_limit import limiter
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.store import Store
@@ -22,6 +28,63 @@ from app.schemas.common import PaginatedResponse
 from app.services.chat_service import ChatService
 
 router = APIRouter()
+
+
+# === Auth Helpers ===
+
+
+def _verify_store_access(store: Store, user: dict | None, session_id: str | None) -> str | None:
+    """Check access to a store's conversations.
+
+    Returns the session_id to scope queries to (None means no scoping — full access).
+
+    Rules:
+    - Authenticated user with matching org: full access (returns None).
+    - Unauthenticated caller with session_id: scoped access (returns session_id).
+    - Unauthenticated caller without session_id: rejected (raises 401).
+    """
+    if user:
+        org_id = get_user_organization_id(user)
+        if store.organization_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Store not found or access denied",
+            )
+        return None  # Full access
+
+    if session_id:
+        return session_id  # Scoped access
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication or session_id required",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def _get_authenticated_store(
+    store_id: UUID = Query(..., description="Store ID"),
+    user: CurrentUser = None,  # type: ignore[assignment]
+    db: DBSession = None,  # type: ignore[assignment]
+) -> Store:
+    """Get store for dashboard endpoints requiring authentication + org ownership."""
+    org_id = get_user_organization_id(user)
+
+    query = select(Store).where(
+        Store.id == store_id,
+        Store.is_active == True,  # noqa: E712
+        Store.organization_id == org_id,
+    )
+    result = await db.execute(query)
+    store = result.scalar_one_or_none()
+
+    if not store:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Store not found or access denied",
+        )
+
+    return store
 
 
 # === Endpoints ===
@@ -80,19 +143,27 @@ async def get_conversation(
     conversation_id: UUID,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
+    session_id: str | None = Query(None, description="Session ID (required for widget access)"),
+    user: OptionalUser = None,
 ) -> ConversationDetailResponse:
     """Get a conversation with all its messages.
 
-    Used to load conversation history in the widget.
+    Authenticated users (dashboard) can access any conversation for their store.
+    Unauthenticated users (widget) must provide session_id and can only access
+    conversations belonging to that session.
     """
-    query = (
-        select(Conversation)
-        .where(
-            Conversation.id == conversation_id,
-            Conversation.store_id == store.id,
-        )
-        .options(selectinload(Conversation.messages))
+    required_session = _verify_store_access(store, user, session_id)
+
+    query = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.store_id == store.id,
     )
+
+    # Widget access: scope to session_id
+    if required_session:
+        query = query.where(Conversation.session_id == required_session)
+
+    query = query.options(selectinload(Conversation.messages))
 
     result = await db.execute(query)
     conversation = result.scalar_one_or_none()
@@ -144,15 +215,22 @@ async def list_conversations(
     search: str | None = Query(None, description="Search by customer name or email"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    user: OptionalUser = None,
 ) -> PaginatedResponse[ConversationDetailResponse]:
     """List conversations for a store.
 
-    When session_id is provided, returns conversations for that session (widget use).
-    Otherwise returns paginated conversations for the store (dashboard use).
+    Authenticated users (dashboard) can list all conversations for their store.
+    Unauthenticated users (widget) must provide session_id and only see their own.
     """
+    required_session = _verify_store_access(store, user, session_id)
+
     base_query = select(Conversation).where(Conversation.store_id == store.id)
 
-    if session_id:
+    # Widget access: always scope to session_id
+    if required_session:
+        base_query = base_query.where(Conversation.session_id == required_session)
+    elif session_id:
+        # Authenticated user optionally filtering by session
         base_query = base_query.where(Conversation.session_id == session_id)
     if status_filter:
         base_query = base_query.where(Conversation.status == status_filter)
@@ -235,11 +313,12 @@ async def update_conversation_status(
     conversation_id: UUID,
     data: ConversationStatusUpdate,
     db: DBSession,
-    store: Store = Depends(get_store_by_id),
+    store: Store = Depends(_get_authenticated_store),
 ) -> ConversationDetailResponse:
     """Update conversation status.
 
-    Used by dashboard to mark conversations as resolved or escalated.
+    Requires authentication. Used by dashboard to mark conversations
+    as resolved or escalated.
     """
     query = (
         select(Conversation)

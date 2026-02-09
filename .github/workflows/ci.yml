@@ -94,6 +94,10 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/reva_test
       REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-ci-only
+      ENCRYPTION_KEY: test-encryption-key-for-ci-only
+      AUTH_URL: http://localhost:3000
+      OPENAI_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -108,8 +112,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+
       - name: Run tests
-        run: uv run pytest --cov=app --cov-report=xml
+        run: uv run pytest --cov=app --cov-report=xml --cov-fail-under=60
 
   build:
     name: Build

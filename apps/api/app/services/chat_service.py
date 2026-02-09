@@ -1,10 +1,14 @@
 """Chat service orchestrating RAG and LLM for responses."""
 
+import logging
 import uuid
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from openai import AsyncOpenAI
+
+logger = logging.getLogger(__name__)
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
@@ -67,6 +71,14 @@ class ChatService:
             context=request.context,
         )
 
+        # Get conversation history BEFORE saving the new message
+        # This ensures the current message isn't in history, avoiding dedup issues
+        # where repeated messages (e.g., "Hello" twice) would be incorrectly skipped
+        history = await self._get_conversation_history(
+            conversation_id=conversation.id,
+            limit=MAX_CONVERSATION_HISTORY,
+        )
+
         # Save user message
         await self._save_message(
             conversation_id=conversation.id,
@@ -89,21 +101,24 @@ class ChatService:
             threshold=0.5,
         )
 
-        # Get conversation history
-        history = await self._get_conversation_history(
-            conversation_id=conversation.id,
-            limit=MAX_CONVERSATION_HISTORY,
-        )
-
         # Generate AI response
         # TODO: Add streaming support in Phase 2
-        response_content, tokens_used = await self._generate_response(
-            store_name=store.name,
-            user_message=request.message,
-            context_chunks=chunks,
-            conversation_history=history,
-            product_context=products,
-        )
+        try:
+            response_content, tokens_used = await self._generate_response(
+                store_name=store.name,
+                user_message=request.message,
+                context_chunks=chunks,
+                conversation_history=history,
+                product_context=products,
+            )
+        except HTTPException:
+            raise  # Re-raise HTTP exceptions as-is
+        except Exception as e:
+            logger.exception("Failed to generate AI response: %s", e)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI service is temporarily unavailable. Please try again.",
+            ) from e
 
         # Create sources from chunks
         sources = self.citation_service.create_sources_from_chunks(chunks)
@@ -250,11 +265,10 @@ class ChatService:
         # Build messages for API
         messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
 
-        # Add conversation history (skip current user message if it's in history)
+        # Add conversation history
+        # Note: History is fetched BEFORE the current message is saved, so we don't
+        # need to filter out the current message here
         for msg in conversation_history:
-            # Skip the current message if it was just added
-            if msg.content == user_message and msg.role == MessageRole.USER:
-                continue
             if msg.role == MessageRole.USER:
                 messages.append(ChatCompletionUserMessageParam(role="user", content=msg.content))
             elif msg.role == MessageRole.ASSISTANT:
