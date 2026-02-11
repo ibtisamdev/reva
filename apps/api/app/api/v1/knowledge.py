@@ -368,6 +368,7 @@ async def update_knowledge_article(
 
     # Re-fetch with eager loading to avoid lazy-load in async context
     article = await service.get_article(article_id, store.id)
+    assert article is not None  # We just updated it, it must exist
 
     return KnowledgeArticleResponse(
         id=article.id,
