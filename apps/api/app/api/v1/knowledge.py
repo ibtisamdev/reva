@@ -62,7 +62,7 @@ async def _ingest_and_respond(
     token_count = service.embedding_service.count_tokens(ingestion_data.content)
     is_large = token_count > 5000
 
-    article = await service.ingest_text(
+    article, embedding_failed = await service.ingest_text(
         store_id=store.id,
         data=ingestion_data,
         process_sync=not is_large,
@@ -76,12 +76,23 @@ async def _ingest_and_respond(
 
     chunks_count = len(article.chunks) if article.chunks else 0
 
+    # Determine status based on processing mode and embedding result
+    if is_large:
+        status = "processing"
+        message = "Document queued for processing"
+    elif embedding_failed:
+        status = "error"
+        message = "Document ingested but embedding generation failed. RAG search may not find this content."
+    else:
+        status = "completed"
+        message = success_message
+
     return IngestionResponse(
         article_id=article.id,
         title=article.title,
         chunks_count=chunks_count,
-        status="processing" if is_large else "completed",
-        message="Document queued for processing" if is_large else success_message,
+        status=status,
+        message=message,
     )
 
 
@@ -365,6 +376,8 @@ async def update_knowledge_article(
         )
 
     await db.commit()
+    # Refresh to get updated timestamp after commit (commit expires attributes)
+    await db.refresh(article)
 
     # Re-fetch with eager loading to avoid lazy-load in async context
     article = await service.get_article(article_id, store.id)

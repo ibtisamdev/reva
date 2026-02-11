@@ -187,7 +187,7 @@ class KnowledgeService:
         store_id: UUID,
         data: TextIngestionRequest,
         process_sync: bool = True,
-    ) -> KnowledgeArticle:
+    ) -> tuple[KnowledgeArticle, bool]:
         """Ingest text content: create article, chunk, and embed.
 
         Args:
@@ -197,8 +197,11 @@ class KnowledgeService:
                          If False, caller should trigger async task.
 
         Returns:
-            The created article with chunks
+            Tuple of (article, embedding_failed) where embedding_failed is True
+            if synchronous embedding generation was attempted but failed.
         """
+        embedding_failed = False
+
         # Create article
         content_hash = hashlib.sha256(data.content.encode()).hexdigest()
         article = KnowledgeArticle(
@@ -242,11 +245,12 @@ class KnowledgeService:
                 )
             except Exception:
                 logger.exception("Failed to generate embeddings for article '%s'", data.title)
+                embedding_failed = True
 
         # Refresh to get the chunks relationship loaded
         await self.db.refresh(article, ["chunks"])
 
-        return article
+        return article, embedding_failed
 
     async def process_article_embeddings(
         self,

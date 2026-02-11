@@ -75,7 +75,8 @@ class TextIngestionRequest(BaseSchema):
     """Request for text ingestion."""
 
     title: str = Field(..., min_length=1, max_length=500)
-    content: str = Field(..., min_length=1)
+    # Max 500KB of content (~100k tokens, prevents abuse)
+    content: str = Field(..., min_length=1, max_length=500_000)
     content_type: ContentType = ContentType.FAQ
     source_url: HttpUrl | None = None
 
@@ -94,5 +95,5 @@ class IngestionResponse(BaseSchema):
     article_id: UUID
     title: str
     chunks_count: int
-    status: str  # "completed" or "processing"
+    status: str  # "completed", "processing", or "error"
     message: str

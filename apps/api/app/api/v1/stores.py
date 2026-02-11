@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.core.deps import (
@@ -25,6 +25,34 @@ from app.schemas.store import (
 )
 
 router = APIRouter()
+
+
+# === Settings Dependencies ===
+
+
+async def _get_store_for_settings_update(
+    store_id: UUID = Query(..., description="Store ID"),
+    user: CurrentUser = None,  # type: ignore[assignment]
+    db: DBSession = None,  # type: ignore[assignment]
+) -> Store:
+    """Get store for settings update, requiring authentication and org ownership."""
+    org_id = get_user_organization_id(user)
+
+    query = select(Store).where(
+        Store.id == store_id,
+        Store.is_active == True,  # noqa: E712
+        Store.organization_id == org_id,
+    )
+    result = await db.execute(query)
+    store = result.scalar_one_or_none()
+
+    if not store:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Store not found or access denied",
+        )
+
+    return store
 
 
 # === Store Settings Endpoints (must be before /{store_id} to avoid route conflicts) ===
@@ -62,7 +90,7 @@ async def get_store_settings(
 async def update_store_settings(
     data: StoreSettingsUpdate,
     db: DBSession,
-    store: Store = Depends(get_store_by_id),
+    store: Store = Depends(_get_store_for_settings_update),
 ) -> StoreSettingsResponse:
     """Update store settings."""
     current_settings = store.settings or {}
