@@ -43,6 +43,7 @@ const activeConnection: ShopifyConnection = {
   status: 'active',
   last_synced_at: '2024-01-15T10:00:00Z',
   product_count: 42,
+  sync_error: null,
 };
 
 const disconnectedConnection: ShopifyConnection = {
@@ -51,6 +52,7 @@ const disconnectedConnection: ShopifyConnection = {
   status: 'disconnected',
   last_synced_at: null,
   product_count: 0,
+  sync_error: null,
 };
 
 function renderWithQuery(ui: React.ReactElement) {

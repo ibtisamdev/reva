@@ -47,7 +47,7 @@ router = APIRouter()
 )
 @limiter.limit("10/minute")
 async def send_message(
-    request: Request,
+    _request: Request,
     chat_request: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
