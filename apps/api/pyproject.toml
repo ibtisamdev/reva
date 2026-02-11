@@ -72,6 +72,9 @@ ignore = [
     "B904",   # raise without from inside except
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG002"]  # Pytest fixtures are often unused in test functions
+
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
