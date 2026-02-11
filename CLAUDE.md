@@ -44,6 +44,6 @@ get-reva/                   # Monorepo root (Turborepo + pnpm workspaces)
 
 ## Deployment
 
-- **Architecture**: Vercel (dashboard) + VPS via Cloudflare Tunnel (API + worker) + Cloudflare Pages (widget)
+- **Architecture**: Coolify on VPS via Cloudflare Tunnel (dashboard + API + worker) + Cloudflare R2 CDN (widget)
 - **Key files**: `docker-compose.prod.yml`, `.github/workflows/ci.yml`, `docker/postgres/init-prod.sql`
 - See **[AGENTS.md](./AGENTS.md)** for full deployment details

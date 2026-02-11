@@ -43,15 +43,19 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone output from builder
+# Copy standalone output from builder (monorepo structure preserved: apps/web/server.js)
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+# Copy public assets (create dir first in case public/ is empty)
+RUN mkdir -p ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public/ ./apps/web/public/
 
 # Switch to non-root user
 USER nextjs
@@ -64,4 +68,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if(r.statusCode !== 200) throw new Error('Unhealthy')})"
 
 # Start the server
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]
