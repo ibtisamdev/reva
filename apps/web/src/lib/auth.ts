@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth';
+import { getMigrations } from 'better-auth/db';
 import { nextCookies } from 'better-auth/next-js';
 import { jwt, organization } from 'better-auth/plugins';
 import { Pool } from 'pg';
 
-export const auth = betterAuth({
+const authConfig = {
   database: new Pool({
     connectionString: process.env.AUTH_DATABASE_URL,
   }),
@@ -66,8 +67,22 @@ export const auth = betterAuth({
     nextCookies(), // Must be last
   ],
 
-  trustedOrigins: ['http://localhost:3000', 'http://localhost:8000'],
-});
+  trustedOrigins: [
+    'http://localhost:3000',
+    'http://localhost:8000',
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+  ].filter((origin): origin is string => Boolean(origin)),
+} satisfies Parameters<typeof betterAuth>[0];
+
+// Run migrations on startup (idempotent — only applies pending migrations)
+getMigrations(authConfig)
+  .then(({ runMigrations }) => runMigrations())
+  .catch((err) => {
+    console.error('[auth] Failed to run migrations:', err);
+  });
+
+export const auth = betterAuth(authConfig);
 
 export type Session = typeof auth.$Infer.Session;
 export type User = typeof auth.$Infer.Session.user;

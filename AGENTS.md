@@ -226,14 +226,14 @@ class ProductService:
 ### Production Architecture
 
 ```
-get-reva.ibtisam.dev     → Coolify VPS via CF Tunnel (Next.js dashboard)
-get-reva-api.ibtisam.dev → Coolify VPS via CF Tunnel (FastAPI + Celery worker)
-get-reva-cdn.ibtisam.dev → Cloudflare R2 CDN        (Preact widget)
+get-reva.ibtisam.dev     → VPS via CF Tunnel → localhost:3000 (Next.js dashboard)
+get-reva-api.ibtisam.dev → VPS via CF Tunnel → localhost:8000 (FastAPI + Celery worker)
+get-reva-cdn.ibtisam.dev → Cloudflare R2 CDN                  (Preact widget)
 ```
 
 ### Infrastructure
 
-Single VPS running Coolify with Docker Compose services:
+Single VPS running Docker Compose (managed by systemd), with cloudflared running separately:
 
 - **postgres** — PostgreSQL with pgvector
 - **redis** — Task queue and caching
@@ -243,19 +243,20 @@ Single VPS running Coolify with Docker Compose services:
 
 ### CI/CD
 
-Push to `main` triggers: lint → test → build. Widget auto-deploys to Cloudflare R2 via GitHub Actions. API + dashboard deploy via Coolify on VPS.
+Push to `main` triggers: lint → test → build → deploy. Widget auto-deploys to Cloudflare R2 via GitHub Actions. API + dashboard deploy via GitHub Actions SSH to VPS.
 
 ### Key Files
 
 - `docker-compose.prod.yml` — Production Docker Compose stack
-- `.github/workflows/ci.yml` — CI/CD pipeline
+- `.github/workflows/ci.yml` — CI/CD pipeline (includes deploy job)
 - `.github/workflows/deploy-widget.yml` — Widget CDN deployment
+- `scripts/deploy.sh` — Manual deploy script
 - `docker/postgres/init-prod.sql` — Production database init
 
 ### Environment Variables
 
-- **Coolify**: Set all runtime secrets in Coolify UI (mirrors `.env.production`)
-- **CI**: GitHub Secrets for Cloudflare R2 deploy (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`)
+- **VPS**: `.env.production` at `/opt/reva/.env.production` (not committed to git)
+- **CI**: GitHub Secrets for deploy (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`) and widget R2 deploy (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`)
 
 ### Production Hardening
 

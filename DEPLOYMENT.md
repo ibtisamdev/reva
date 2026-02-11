@@ -1,176 +1,204 @@
 # Reva Deployment Guide
 
-This guide covers deploying Reva on a homelab using Coolify for orchestration.
+Deploy Reva on a VPS using Docker Compose, managed by systemd. Docker images are built in CI and pushed to GitHub Container Registry (GHCR). Auto-deploy via GitHub Actions on push to main. cloudflared runs separately on the VPS (not part of this project).
 
 ## Architecture Overview
 
 ```
-Internet → [Cloudflare Tunnel] → [Coolify Traefik :80/:443]
-                                   → get-reva.ibtisam.dev  → [web :3000]  (Next.js)
-                                   → get-reva-api.ibtisam.dev  → [api :8000]  (FastAPI)
+Internet → Cloudflare → Tunnel → cloudflared (separate on VPS)
+                                   → localhost:3000 → [web]  (Next.js)
+                                   → localhost:8000 → [api]  (FastAPI)
 
-Internal:  [postgres :5432] [redis :6379]
-Background: [worker] (Celery)
-Static:    widget.js → Cloudflare R2 CDN
+Docker Compose services (pre-built images from GHCR):
+  [postgres :5432] [redis :6379] [api :8000] [worker] [web :3000]
+
+Static: widget.js → Cloudflare R2 CDN
 ```
 
 ## Prerequisites
 
-- Homelab server with 16GB RAM running Ubuntu Server
+- VPS with 4GB+ RAM running Ubuntu/Debian
 - Docker and Docker Compose installed
 - Domain name with DNS managed by Cloudflare
-- GitHub account (for widget CI/CD)
-- Cloudflare R2 bucket for widget hosting
+- cloudflared installed and configured separately on the VPS
+- GitHub account with repository access
 
-## 1. Install Coolify
+## 1. One-Time VPS Setup
 
-On your homelab server:
-
-```bash
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
-```
-
-Access Coolify UI at `http://your-homelab-ip:8000`
-
-## 2. Add Reva Project to Coolify
-
-1. In Coolify UI, go to **Projects** → **New Resource**
-2. Select **Docker Compose** resource type
-3. Connect your GitHub repository
-4. Select `docker-compose.prod.yml` as the compose file
-5. Choose a name for your deployment (e.g., "reva-production")
-
-## 3. Configure Environment Variables
-
-In Coolify UI, add these environment variables (use `.env.production.example` as reference):
-
-### Generate Secrets
-
-Run these commands locally and copy the output:
+### Clone the repository
 
 ```bash
-# Database password
-openssl rand -base64 24
-
-# Redis password
-openssl rand -base64 24
-
-# API secret key
-openssl rand -hex 32
-
-# Encryption key
-openssl rand -hex 32
-
-# Better Auth secret
-openssl rand -base64 32
+sudo mkdir -p /opt/reva && sudo chown $USER:$USER /opt/reva
+git clone <repo-url> /opt/reva
+cd /opt/reva
 ```
 
-### Required Variables
+### Authenticate with GHCR
 
-Set these in Coolify's Environment Variables section:
-
-```env
-# Database
-POSTGRES_PASSWORD=<generated-above>
-
-# Redis
-REDIS_PASSWORD=<generated-above>
-
-# Security
-SECRET_KEY=<generated-above>
-ENCRYPTION_KEY=<generated-above>
-BETTER_AUTH_SECRET=<generated-above>
-
-# Environment
-ENVIRONMENT=production
-
-# Domains
-NEXT_PUBLIC_API_URL=https://get-reva-api.ibtisam.dev
-NEXT_PUBLIC_APP_URL=https://get-reva.ibtisam.dev
-ALLOWED_ORIGINS=https://get-reva.ibtisam.dev,https://www.get-reva.ibtisam.dev
-
-# API Keys (get from respective platforms)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-RESEND_API_KEY=re_...
-
-# Shopify (get from Partner Dashboard)
-SHOPIFY_API_KEY=...
-SHOPIFY_API_SECRET=...
-SHOPIFY_WEBHOOK_SECRET=...
-
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-```
-
-## 4. Configure Domains in Coolify
-
-1. Go to your Reva deployment in Coolify
-2. For the **web** service:
-   - Click on service settings
-   - Set domain: `get-reva.ibtisam.dev`
-   - Enable SSL (Let's Encrypt)
-3. For the **api** service:
-   - Click on service settings
-   - Set domain: `get-reva-api.ibtisam.dev`
-   - Enable SSL (Let's Encrypt)
-
-## 5. Setup Cloudflare Tunnel
-
-Configure Cloudflare Tunnel to route traffic to your homelab:
-
-1. In Cloudflare dashboard, go to **Zero Trust** → **Access** → **Tunnels**
-2. Create a new tunnel
-3. Install the tunnel connector on your homelab
-4. Add public hostnames:
-   - `get-reva.ibtisam.dev` → `http://localhost:80`
-   - `get-reva-api.ibtisam.dev` → `http://localhost:80`
-
-Coolify's Traefik will handle routing based on hostname.
-
-## 6. Deploy
-
-1. In Coolify UI, click **Deploy** on your Reva resource
-2. Coolify will:
-   - Pull the latest code from GitHub
-   - Build Docker images for api, worker, and web
-   - Start all services
-   - Configure SSL certificates
-   - Setup reverse proxy routing
-
-Monitor the deployment logs in Coolify UI.
-
-## 7. Run Database Migrations
-
-After the first deployment, run migrations:
+Create a GitHub Personal Access Token with `read:packages` scope, then:
 
 ```bash
-# Find the API container name
-docker ps | grep api
-
-# Run migrations
-docker exec -it <api-container-name> alembic upgrade head
+echo "<PAT>" | docker login ghcr.io -u <github-username> --password-stdin
 ```
 
-Or use Coolify's exec feature in the UI.
-
-## 8. Setup Database Backups
-
-On your homelab server:
+### Create .env.production
 
 ```bash
-# Copy backup script to a permanent location
-sudo cp /path/to/reva/scripts/backup-db.sh /usr/local/bin/reva-backup.sh
+cp .env.production.example .env.production
+nano .env.production
+```
 
-# Make it executable
+Fill in all values. Generate secrets with:
+
+```bash
+openssl rand -hex 24   # For POSTGRES_PASSWORD, REDIS_PASSWORD
+openssl rand -hex 32   # For SECRET_KEY, ENCRYPTION_KEY, BETTER_AUTH_SECRET
+```
+
+> **Note:** Use `openssl rand -hex` (not `-base64`) for passwords embedded in connection URLs — base64 produces `/`, `+`, `=` which break URL parsing.
+
+**Required variables** (see `.env.production.example` for the full list):
+- `POSTGRES_PASSWORD` — database password
+- `DATABASE_URL` — API connection string (uses Docker hostname `postgres`)
+- `AUTH_DATABASE_URL` — Better Auth connection string (uses `postgres` hostname, standard `postgresql://` driver)
+- `REDIS_PASSWORD` / `REDIS_URL` — cache/queue connection
+- `SECRET_KEY`, `ENCRYPTION_KEY`, `BETTER_AUTH_SECRET` — security keys
+- `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL` — public URLs
+- `OPENAI_API_KEY` — for RAG chat
+
+### Create systemd unit
+
+This ensures the stack starts on boot:
+
+```bash
+sudo tee /etc/systemd/system/reva.service << 'EOF'
+[Unit]
+Description=Reva Production Stack
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/reva
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.production down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable reva
+sudo systemctl start reva
+```
+
+### Run initial migrations
+
+```bash
+docker exec $(docker ps -qf "name=api") alembic upgrade head
+```
+
+## 2. Cloudflare Tunnel Configuration
+
+cloudflared runs as a separate service on the VPS (not managed by this project). Update hostname targets in the Cloudflare dashboard:
+
+| Hostname | Target |
+|----------|--------|
+| `get-reva.ibtisam.dev` | `http://localhost:3000` |
+| `get-reva-api.ibtisam.dev` | `http://localhost:8000` |
+
+In Cloudflare dashboard: **Zero Trust** → **Networks** → **Tunnels** → select tunnel → **Public Hostnames**.
+
+## 3. GitHub Configuration
+
+### Secrets
+
+Add in **Settings** → **Secrets and variables** → **Actions** → **Secrets**:
+
+| Secret | Description |
+|--------|-------------|
+| `VPS_HOST` | VPS IP address or hostname |
+| `VPS_USER` | SSH username on the VPS |
+| `VPS_SSH_KEY` | Private SSH key for the VPS user |
+| `CLOUDFLARE_API_TOKEN` | For widget R2 deployment |
+| `CLOUDFLARE_ACCOUNT_ID` | For widget R2 deployment |
+
+### Variables
+
+Add in **Settings** → **Secrets and variables** → **Actions** → **Variables**:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_API_URL` | Public API URL | `https://get-reva-api.ibtisam.dev` |
+| `NEXT_PUBLIC_APP_URL` | Public app URL | `https://get-reva.ibtisam.dev` |
+
+## 4. CI/CD Pipeline
+
+Push to `main` triggers the CI pipeline (`.github/workflows/ci.yml`):
+
+1. **Lint** — frontend + backend in parallel
+2. **Test** — backend tests + frontend tests in parallel
+3. **Build & Push** — Docker images built and pushed to GHCR (tagged with commit SHA + `latest`)
+4. **Deploy** — SSH into VPS, pull pre-built images, sequential service updates with health checks, auto-rollback on failure
+
+### Deploy flow
+
+```
+CI builds images → pushes to GHCR → SSHs to VPS
+  → pulls images → updates api (waits for healthy)
+  → updates worker → updates web (waits for healthy)
+  → if health fails → auto-rollback to previous version
+```
+
+### Manual deploy
+
+SSH into the VPS and run:
+
+```bash
+cd /opt/reva && bash scripts/deploy.sh
+```
+
+### Rollback
+
+```bash
+cd /opt/reva && bash scripts/deploy.sh --rollback
+```
+
+### Deploy with migrations
+
+```bash
+cd /opt/reva && bash scripts/deploy.sh --migrate
+```
+
+### Local Docker builds
+
+To build images locally (for testing), use the build override file:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.production build
+```
+
+## 5. Database Migrations
+
+Migrations are NOT auto-run during deploys. Run manually when deploying schema changes:
+
+```bash
+# Via deploy script
+bash scripts/deploy.sh --migrate
+
+# Or directly
+docker exec $(docker ps -qf "name=api") alembic upgrade head
+```
+
+## 6. Database Backups
+
+```bash
+# Copy backup script
+sudo cp /opt/reva/scripts/backup-db.sh /usr/local/bin/reva-backup.sh
 sudo chmod +x /usr/local/bin/reva-backup.sh
 
-# Edit the script to set correct paths
-sudo nano /usr/local/bin/reva-backup.sh
-# Update COMPOSE_FILE path
-
-# Add to crontab (runs daily at 3 AM)
+# Add to crontab (daily at 3 AM)
 sudo crontab -e
 ```
 
@@ -180,128 +208,87 @@ Add this line:
 0 3 * * * /usr/local/bin/reva-backup.sh >> /var/log/reva-backup.log 2>&1
 ```
 
-## 9. Configure Widget CI/CD
-
-### Setup Cloudflare R2 Bucket
-
-1. Create an R2 bucket named `get-reva-cdn`
-2. Enable public access
-3. Note your Account ID
-
-### Add GitHub Secrets
-
-In your GitHub repository settings, add:
-
-- `CLOUDFLARE_API_TOKEN` - Create from Cloudflare dashboard with R2 edit permissions
-- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare Account ID
-
-### Update Workflow
-
-Edit `.github/workflows/deploy-widget.yml`:
-
-- Replace `get-reva-api.ibtisam.dev` with your actual API domain
-- Replace `get-reva-cdn.ibtisam.dev` with your R2 bucket's public URL
-
-The widget will auto-deploy on every push to `main` that touches `apps/widget/`.
-
-## 10. Verify Deployment
-
-Check these endpoints:
+### Restore from backup
 
 ```bash
-# API health
-curl https://get-reva-api.ibtisam.dev/api/v1/health
+ls -lh /var/backups/reva/
+docker exec -i $(docker ps -qf "name=postgres") pg_restore -U postgres -d reva < /var/backups/reva/reva_YYYYMMDD_HHMMSS.dump
+```
 
-# Web app
+## 7. Verify Deployment
+
+```bash
+# Check deployed version
+cat /opt/reva/.current-deploy-tag
+
+# Local health checks (from VPS)
+curl http://localhost:8000/api/v1/health
+curl http://localhost:3000/api/health
+
+# External access (after cloudflared is configured)
+curl https://get-reva-api.ibtisam.dev/api/v1/health
 curl https://get-reva.ibtisam.dev
 
-# Widget (after CI/CD runs)
-curl https://get-reva-cdn.ibtisam.dev/reva-widget.iife.js
+# Container status
+docker compose -f docker-compose.prod.yml ps
+
+# Boot persistence
+sudo systemctl restart reva
 ```
 
 ## Resource Usage
 
-Expected memory usage on 16GB homelab:
-
 | Service | RAM |
 |---------|-----|
-| Reva API | ~300MB |
-| Reva Worker | ~500MB |
-| Reva Web | ~200MB |
+| API | ~300MB |
+| Worker | ~500MB |
+| Web | ~200MB |
 | Postgres | ~400MB |
 | Redis | ~128MB |
-| **Reva Total** | **~1.5GB** |
-| Coolify + Traefik | ~600MB |
-| Build spike (temporary) | +2-4GB |
+| **Total** | **~1.5GB** |
 
-Total peak usage: ~8-10GB (leaves headroom on 16GB)
-
-## Maintenance
-
-### View Logs
-
-Use Coolify UI to view real-time logs for each service.
-
-### Update Deployment
-
-Push changes to your GitHub repository. Coolify can auto-deploy on push (configure in settings).
-
-### Rollback
-
-Use Coolify's deployment history to rollback to a previous version.
-
-### Scale Services
-
-Adjust the number of replicas in Coolify UI if needed.
-
-### Backup Restore
-
-To restore from backup:
-
-```bash
-# Find backup file
-ls -lh /var/backups/reva/
-
-# Restore database
-docker exec -i <postgres-container> pg_restore -U postgres -d reva < /var/backups/reva/reva_20240207_030000.dump
-```
+> Note: builds now happen in CI, not on the VPS, so there is no build spike on production.
 
 ## Troubleshooting
 
-### Containers not starting
-
-Check logs in Coolify UI or:
+### View logs
 
 ```bash
-docker compose -f /path/to/docker-compose.prod.yml logs -f
+# All services
+docker compose -f docker-compose.prod.yml logs -f
+
+# Single service
+docker compose -f docker-compose.prod.yml logs -f api
+docker compose -f docker-compose.prod.yml logs -f web
+docker compose -f docker-compose.prod.yml logs -f worker
+```
+
+### Containers not starting
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f <service>
 ```
 
 ### Database connection errors
 
-Verify Postgres is healthy:
+```bash
+docker exec $(docker ps -qf "name=postgres") pg_isready -U postgres
+```
+
+### Postgres password changed but not taking effect
+
+If you changed `POSTGRES_PASSWORD` after initial setup, the DB retains the old password (stored in the volume). Reset with:
 
 ```bash
-docker ps | grep postgres
-docker exec <postgres-container> pg_isready -U postgres
+cd /opt/reva
+docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# WARNING: This destroys all data. Restore from backup afterward.
 ```
 
 ### Widget not loading
 
-1. Check GitHub Actions workflow logs
+1. Check GitHub Actions workflow logs for `deploy-widget.yml`
 2. Verify R2 bucket public access
 3. Check CORS settings on R2 bucket
-
-### SSL certificate issues
-
-Coolify handles Let's Encrypt automatically. Verify:
-- Domains are correctly configured in Coolify
-- Cloudflare Tunnel is routing correctly
-- Firewall allows ports 80/443
-
-## Support
-
-For issues:
-- Check Coolify logs
-- Review application logs in Coolify UI
-- Verify environment variables are set correctly
-- Ensure all external API keys are valid

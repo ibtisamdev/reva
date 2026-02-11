@@ -15,6 +15,7 @@ class ShopifyConnectionResponse(BaseSchema):
     status: str
     last_synced_at: datetime | None = None
     product_count: int = 0
+    sync_error: str | None = None
 
 
 class SyncStatusResponse(BaseSchema):

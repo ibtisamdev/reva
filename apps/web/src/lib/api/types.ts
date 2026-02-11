@@ -184,6 +184,7 @@ export interface ShopifyConnection {
   status: IntegrationStatus;
   last_synced_at: string | null;
   product_count: number;
+  sync_error: string | null;
 }
 
 export interface SyncStatus {
