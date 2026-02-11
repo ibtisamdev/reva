@@ -35,8 +35,9 @@ services:
 
   # --- App ---
   api:
-    build: ./apps/api
+    image: ghcr.io/ibtisamdev/reva/api:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       - "8000:8000"
     env_file: .env.production
@@ -44,14 +45,14 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
   worker:
-    build: ./apps/api
+    image: ghcr.io/ibtisamdev/reva/api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     command: celery -A app.workers.celery_app worker --loglevel=info -Q default,sync,recovery --concurrency=4
     env_file: .env.production
@@ -62,13 +63,9 @@ services:
       redis: { condition: service_healthy }
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    image: ghcr.io/ibtisamdev/reva/web:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 15s
     ports:
       - "3000:3000"
     env_file: .env.production

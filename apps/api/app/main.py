@@ -60,12 +60,14 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(SlowAPIMiddleware)
 
-    # CORS — allow all origins (widget runs on arbitrary Shopify domains).
-    # Dashboard security is enforced via JWT auth, not CORS.
+    # CORS — dashboard origins are explicitly listed (with credentials for cookies/JWT).
+    # Widget runs on arbitrary Shopify store domains and needs CORS too, so we allow
+    # any http/https origin via regex. Starlette echoes the specific requesting origin.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
+        allow_origins=settings.allowed_origins,
+        allow_origin_regex=r"https?://.+",
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )

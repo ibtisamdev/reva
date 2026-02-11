@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     shopify_client_id: str = ""
     shopify_client_secret: str = ""
     shopify_scopes: str = "read_products,read_content"
-    shopify_api_version: str = "2024-01"
+    shopify_api_version: str = "2025-01"
 
     # URLs
     api_url: str = "http://localhost:8000"
@@ -57,6 +57,7 @@ class Settings(BaseSettings):
 
     # Authentication (Better Auth)
     auth_url: str = "http://localhost:3000"  # Next.js app URL where Better Auth runs
+    auth_jwks_url: str = ""  # Internal URL for JWKS fetch (Docker: http://web:3000/api/auth/jwks)
 
     # Error tracking (GlitchTip/Sentry)
     sentry_dsn: str = ""
@@ -65,8 +66,8 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 10
 
-    # CORS
-    cors_origins: list[str] = [
+    # CORS — set via ALLOWED_ORIGINS env var as JSON array: '["https://example.com"]'
+    allowed_origins: list[str] = [
         "http://localhost:3000",  # Next.js dashboard
         "http://localhost:5173",  # Vite widget dev
     ]

@@ -10,7 +10,7 @@ set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/reva}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-COMPOSE_FILE="${COMPOSE_FILE:-/path/to/reva/docker-compose.prod.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-/opt/reva/docker-compose.prod.yml}"
 
 # Database names
 DATABASES=("reva" "reva_auth")

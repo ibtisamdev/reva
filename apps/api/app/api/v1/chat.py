@@ -47,8 +47,8 @@ router = APIRouter()
 )
 @limiter.limit("10/minute")
 async def send_message(
-    http_request: Request,  # noqa: ARG001 — required by slowapi
-    request: ChatRequest,
+    request: Request,  # noqa: ARG001 - Required by slowapi limiter
+    chat_request: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
     _user: OptionalUser = None,  # Reserved for future use (e.g., linking to customer)
@@ -60,11 +60,11 @@ async def send_message(
     service = ChatService(db)
 
     # Use session_id from request or None (service will generate one)
-    session_id = request.session_id
+    session_id = chat_request.session_id
 
     response = await service.process_message(
         store=store,
-        request=request,
+        request=chat_request,
         session_id=session_id,
     )
 
