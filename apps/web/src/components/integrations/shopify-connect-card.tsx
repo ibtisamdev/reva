@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, RefreshCw, Unplug } from 'lucide-react';
+import { AlertCircle, ExternalLink, Loader2, RefreshCw, Unplug } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,16 +24,43 @@ export function ShopifyConnectCard() {
   const storeId = useRequiredStoreId();
   const queryClient = useQueryClient();
   const [shopDomain, setShopDomain] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const lastSyncedAtRef = useRef<string | null>(null);
 
   const { data: connection, isLoading } = useQuery({
     queryKey: shopifyKeys.status(storeId),
     queryFn: () => getShopifyStatus(storeId),
+    refetchInterval: isSyncing ? 3000 : false,
   });
+
+  // Detect sync completion or failure while polling
+  useEffect(() => {
+    if (!isSyncing || !connection) return;
+
+    // Sync failed — error appeared
+    if (connection.sync_error) {
+      setIsSyncing(false);
+      toast.error('Product sync failed', { description: connection.sync_error });
+      return;
+    }
+
+    // Sync completed — last_synced_at changed
+    if (
+      connection.last_synced_at &&
+      connection.last_synced_at !== lastSyncedAtRef.current
+    ) {
+      setIsSyncing(false);
+      toast.success(`Synced ${connection.product_count} products`);
+      queryClient.invalidateQueries({ queryKey: productKeys.all });
+    }
+  }, [isSyncing, connection, queryClient]);
 
   const syncMutation = useMutation({
     mutationFn: () => triggerShopifySync(storeId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: shopifyKeys.status(storeId) });
+      // Record current timestamp so we can detect when it changes
+      lastSyncedAtRef.current = connection?.last_synced_at ?? null;
+      setIsSyncing(true);
     },
   });
 
@@ -100,19 +128,34 @@ export function ShopifyConnectCard() {
                 </span>
               </div>
             </div>
+
+            {isSyncing && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Syncing products from Shopify...
+              </div>
+            )}
+
+            {connection.sync_error && !isSyncing && (
+              <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Last sync failed: {connection.sync_error}</span>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
+                disabled={syncMutation.isPending || isSyncing}
               >
-                {syncMutation.isPending ? (
+                {syncMutation.isPending || isSyncing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                Resync Products
+                {isSyncing ? 'Syncing...' : 'Resync Products'}
               </Button>
               <Button
                 variant="outline"

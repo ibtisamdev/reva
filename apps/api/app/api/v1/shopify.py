@@ -223,6 +223,10 @@ async def trigger_sync(
     if not integration:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No active Shopify integration")
 
+    # Clear previous sync error before starting new sync
+    integration.sync_error = None
+    await db.commit()
+
     sync_products_full.delay(str(store_id))
     return SyncStatusResponse(status="syncing", message="Product sync started")
 
@@ -259,4 +263,5 @@ async def connection_status(
         status=integration.status.value,
         last_synced_at=integration.last_synced_at,
         product_count=product_count,
+        sync_error=integration.sync_error,
     )

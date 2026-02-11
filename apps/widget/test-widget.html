@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,11 +13,26 @@
       padding: 0 20px;
       color: #333;
     }
-    h1 { color: #111; }
-    .info { background: #f0f4ff; border-radius: 8px; padding: 16px; margin: 20px 0; }
-    .info code { background: #e0e7ff; padding: 2px 6px; border-radius: 4px; }
+
+    h1 {
+      color: #111;
+    }
+
+    .info {
+      background: #f0f4ff;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+
+    .info code {
+      background: #e0e7ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
   </style>
 </head>
+
 <body>
   <h1>Reva Chat Widget - Test Page</h1>
   <div class="info">
@@ -26,11 +42,12 @@
   </div>
   <p>Click the chat button in the bottom-right corner to start a conversation.</p>
   <h2>Sample Store Page Content</h2>
-  <p>Welcome to our store! We sell high-quality products with fast shipping and easy returns. Our return policy allows returns within 30 days of purchase.</p>
+  <p>Welcome to our store! We sell high-quality products with fast shipping and easy returns. Our return policy allows
+    returns within 30 days of purchase.</p>
 
   <script>
     window.RevaConfig = {
-      storeId: 'eaf26ca0-37b1-4c8e-bdab-c570f31e80ad',
+      storeId: 'b204f5aa-8f48-4cbf-a35c-c7db6fe51e5a',
       apiUrl: 'http://localhost:8000',
       theme: {
         primaryColor: '#6366f1'
@@ -41,4 +58,5 @@
   <div id="reva-widget"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
+
 </html>

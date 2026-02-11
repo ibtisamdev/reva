@@ -5,9 +5,14 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 
-import { isApiError, sendMessage } from '../lib/api';
+import { getConversation, isApiError, sendMessage } from '../lib/api';
 import { getPageContext } from '../lib/context';
-import { getConversationId, getSessionId, setConversationId } from '../lib/session';
+import {
+  clearConversation,
+  getConversationId,
+  getSessionId,
+  setConversationId,
+} from '../lib/session';
 import type { ApiError, Message } from '../types';
 import { ChatMessage } from './ChatMessage';
 
@@ -33,6 +38,7 @@ export function ChatWindow({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Conversation state - initialized from localStorage
   const [conversationId, setConversationIdState] = useState<string | null>(() =>
@@ -46,6 +52,36 @@ export function ChatWindow({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Restore conversation history on mount
+  useEffect(() => {
+    const savedId = getConversationId();
+    if (!savedId) return;
+
+    setIsRestoring(true);
+
+    getConversation(apiUrl, storeId, savedId).then((result) => {
+      if (isApiError(result)) {
+        // Conversation not found or fetch failed — clear stale ID and start fresh
+        clearConversation();
+        setConversationIdState(null);
+      } else {
+        const restored: Message[] = result.messages
+          .filter((m) => m.role !== 'system')
+          .map((m) => ({
+            id: m.id,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            sources: m.sources ?? undefined,
+          }));
+
+        if (restored.length > 0) {
+          setMessages(restored);
+        }
+      }
+      setIsRestoring(false);
+    });
+  }, []);
 
   // Check if widget is properly configured
   const isConfigured = Boolean(storeId);
@@ -174,7 +210,7 @@ export function ChatWindow({
         ))}
 
         {/* Loading indicator */}
-        {isLoading && (
+        {(isLoading || isRestoring) && (
           <div className="reva-typing">
             <span></span>
             <span></span>
@@ -208,13 +244,13 @@ export function ChatWindow({
           placeholder="Type a message..."
           value={input}
           onInput={(e) => setInput((e.target as HTMLInputElement).value)}
-          disabled={isLoading}
+          disabled={isLoading || isRestoring}
           aria-label="Message input"
         />
         <button
           type="submit"
           className="reva-send-button"
-          disabled={!input.trim() || isLoading}
+          disabled={!input.trim() || isLoading || isRestoring}
           aria-label="Send message"
         >
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

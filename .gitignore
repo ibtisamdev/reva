@@ -17,6 +17,7 @@ __pycache__
 .venv
 venv
 .env
+.env.production
 *.egg-info
 .eggs
 .mypy_cache
@@ -54,3 +55,4 @@ test-results
 
 # Misc
 *.pem
+tmp/

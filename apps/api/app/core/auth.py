@@ -22,7 +22,7 @@ def get_jwks_client() -> PyJWKClient:
     """Get or create JWKS client."""
     global _jwks_client
     if _jwks_client is None:
-        jwks_url = f"{settings.auth_url}/api/auth/jwks"
+        jwks_url = settings.auth_jwks_url or f"{settings.auth_url}/api/auth/jwks"
         _jwks_client = PyJWKClient(jwks_url, cache_keys=True)
     return _jwks_client
 

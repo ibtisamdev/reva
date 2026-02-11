@@ -35,9 +35,11 @@ celery_app.conf.update(
     # Worker settings
     worker_prefetch_multiplier=1,
     worker_concurrency=4,
+    # Default queue name (must match worker -Q flag)
+    task_default_queue="default",
     # Task routing (for future scaling)
     task_routes={
-        "app.workers.tasks.sync.*": {"queue": "sync"},
+        "tasks.shopify.*": {"queue": "sync"},
         "app.workers.tasks.recovery.*": {"queue": "recovery"},
     },
     # Beat schedule (for periodic tasks)

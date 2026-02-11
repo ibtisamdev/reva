@@ -1,0 +1,16 @@
+# Override file for local Docker builds
+# Usage: docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.production build
+services:
+  api:
+    build: ./apps/api
+
+  worker:
+    build: ./apps/api
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}

@@ -65,7 +65,9 @@ cp apps/web/.env.example apps/web/.env
 
 Key variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_DATABASE_URL`, `BETTER_AUTH_SECRET`, API keys.
 
-Generate secrets with: `openssl rand -base64 32`
+Generate secrets with: `openssl rand -hex 32`
+
+> **Note:** Use `openssl rand -hex` (not `-base64`) for passwords embedded in connection URLs (`DATABASE_URL`, `REDIS_URL`) — base64 produces `/`, `+`, `=` which break URL parsing.
 
 ### Install & Migrate
 
@@ -224,38 +226,37 @@ class ProductService:
 ### Production Architecture
 
 ```
-app.reva.app    → Vercel          (Next.js dashboard)
-api.reva.app    → VPS via CF Tunnel (FastAPI + Celery worker)
-widget.reva.app → Cloudflare Pages (Preact widget)
-errors.reva.app → VPS via CF Tunnel (GlitchTip)
+get-reva.ibtisam.dev     → VPS via CF Tunnel → localhost:3000 (Next.js dashboard)
+get-reva-api.ibtisam.dev → VPS via CF Tunnel → localhost:8000 (FastAPI + Celery worker)
+get-reva-cdn.ibtisam.dev → Cloudflare R2 CDN                  (Preact widget)
 ```
 
 ### Infrastructure
 
-Single VPS running Docker Compose with these services:
+Single VPS running Docker Compose (managed by systemd), with cloudflared running separately:
 
 - **postgres** — PostgreSQL with pgvector
 - **redis** — Task queue and caching
-- **api** — FastAPI application
-- **worker** — Celery worker
-- **cloudflared** — Cloudflare Tunnel for `api.reva.app` and `errors.reva.app`
-- **glitchtip** + **glitchtip-worker** — Error tracking
+- **api** — FastAPI application (2 uvicorn workers)
+- **worker** — Celery worker (shares API image, healthcheck disabled)
+- **web** — Next.js dashboard (standalone mode)
 
 ### CI/CD
 
-Push to `main` triggers: lint → test → build → parallel deploy (API via SSH, widget via Cloudflare Pages). The dashboard auto-deploys via Vercel.
+Push to `main` triggers: lint → test → build → deploy. Widget auto-deploys to Cloudflare R2 via GitHub Actions. API + dashboard deploy via GitHub Actions SSH to VPS.
 
 ### Key Files
 
 - `docker-compose.prod.yml` — Production Docker Compose stack
-- `.github/workflows/ci.yml` — CI/CD pipeline
+- `.github/workflows/ci.yml` — CI/CD pipeline (includes deploy job)
+- `.github/workflows/deploy-widget.yml` — Widget CDN deployment
+- `scripts/deploy.sh` — Manual deploy script
 - `docker/postgres/init-prod.sql` — Production database init
 
 ### Environment Variables
 
-- **VPS**: `.env.production` with all runtime secrets
-- **CI**: GitHub Secrets for deploy credentials and build-time vars
-- **Dashboard**: Vercel environment variables
+- **VPS**: `.env.production` at `/opt/reva/.env.production` (not committed to git)
+- **CI**: GitHub Secrets for deploy (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`) and widget R2 deploy (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`)
 
 ### Production Hardening
 
