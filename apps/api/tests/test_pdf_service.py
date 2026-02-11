@@ -45,12 +45,12 @@ class TestExtractTextFromPdf:
         """Exception is raised for random bytes that are not a PDF."""
         invalid_bytes = b"This is not a PDF file at all, just random text."
 
-        with pytest.raises(Exception):  # pypdf raises various exceptions
+        with pytest.raises(Exception):  # noqa: B017 - pypdf raises various exceptions
             extract_text_from_pdf(invalid_bytes)
 
     def test_raises_on_corrupted_pdf(self, corrupted_pdf_bytes: bytes) -> None:
         """Exception is raised for truncated/corrupted PDF files."""
-        with pytest.raises(Exception):  # pypdf raises PdfReadError or similar
+        with pytest.raises(Exception):  # noqa: B017 - pypdf raises PdfReadError or similar
             extract_text_from_pdf(corrupted_pdf_bytes)
 
     def test_handles_pdf_with_special_characters(self) -> None:

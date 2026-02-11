@@ -18,7 +18,6 @@ from httpx import HTTPStatusError, Response
 from app.integrations.shopify.client import ShopifyClient
 from tests.conftest import SHOPIFY_TEST_SHOP
 
-
 # ---------------------------------------------------------------------------
 # Tests: ShopifyClient initialization
 # ---------------------------------------------------------------------------

@@ -7,8 +7,6 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from openai import AsyncOpenAI
-
-logger = logging.getLogger(__name__)
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
@@ -24,6 +22,8 @@ from app.models.store import Store
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.citation_service import CitationService
 from app.services.retrieval_service import RetrievalService, RetrievedChunk, RetrievedProduct
+
+logger = logging.getLogger(__name__)
 
 # Constants
 CHAT_MODEL = "gpt-4o"

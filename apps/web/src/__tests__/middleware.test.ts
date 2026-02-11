@@ -57,7 +57,7 @@ describe('middleware', () => {
 
   describe('unauthenticated users on protected routes', () => {
     it('should redirect unauthenticated user from /dashboard to /sign-in', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/dashboard');
       const response = middleware(request);
@@ -68,7 +68,7 @@ describe('middleware', () => {
     });
 
     it('should include callbackUrl in redirect', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/dashboard');
       const response = middleware(request);
@@ -78,7 +78,7 @@ describe('middleware', () => {
     });
 
     it('should protect nested dashboard routes', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/dashboard/settings/widget');
       const response = middleware(request);
@@ -90,7 +90,7 @@ describe('middleware', () => {
     });
 
     it('should protect /dashboard/conversations', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/dashboard/conversations');
       const response = middleware(request);
@@ -102,7 +102,7 @@ describe('middleware', () => {
     });
 
     it('should protect /dashboard/knowledge', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/dashboard/knowledge');
       const response = middleware(request);
@@ -138,7 +138,7 @@ describe('middleware', () => {
 
   describe('unauthenticated users on public routes', () => {
     it('should allow unauthenticated user to access home page', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/');
       const response = middleware(request);
@@ -148,7 +148,7 @@ describe('middleware', () => {
     });
 
     it('should allow unauthenticated user to access /sign-in', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/sign-in');
       const response = middleware(request);
@@ -158,7 +158,7 @@ describe('middleware', () => {
     });
 
     it('should allow unauthenticated user to access /sign-up', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       const request = createMockRequest('/sign-up');
       const response = middleware(request);
@@ -191,7 +191,7 @@ describe('middleware', () => {
     });
 
     it('should preserve query parameters in callbackUrl', () => {
-      mockedGetSessionCookie.mockReturnValue(undefined);
+      mockedGetSessionCookie.mockReturnValue(null);
 
       // Note: pathname doesn't include query params
       const request = createMockRequest('/dashboard');

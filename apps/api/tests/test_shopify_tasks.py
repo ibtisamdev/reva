@@ -10,8 +10,9 @@ We test the async implementations directly rather than the sync wrappers,
 as the wrappers are just thin shells that create event loops.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -20,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.encryption import encrypt_token
-from app.models.integration import IntegrationStatus, PlatformType, StoreIntegration
+from app.models.integration import IntegrationStatus
 from app.models.product import Product
 from app.models.store import Store
 from app.workers.tasks.shopify import (
@@ -28,7 +29,6 @@ from app.workers.tasks.shopify import (
     _strip_html,
     product_to_text,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper Function Tests: _strip_html
@@ -312,7 +312,7 @@ class TestSyncProductsFullAsync:
         integration_factory: Callable[..., Any],
         sample_shopify_products: list[dict[str, Any]],
         db_session: AsyncSession,
-        mock_embedding_service_for_tasks: MagicMock,
+        _mock_embedding_service_for_tasks: MagicMock,
     ) -> None:
         """Fetches products from Shopify and upserts to DB."""
         from app.workers.tasks.shopify import _sync_products_full_async
@@ -332,7 +332,7 @@ class TestSyncProductsFullAsync:
                 mock_client.get_all_products = AsyncMock(return_value=sample_shopify_products)
                 mock_client_class.return_value = mock_client
 
-                with patch("app.workers.tasks.shopify.generate_product_embeddings") as mock_embed:
+                with patch("app.workers.tasks.shopify.generate_product_embeddings"):
                     result = await _sync_products_full_async(store.id)
 
         assert result["status"] == "completed"

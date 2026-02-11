@@ -4,7 +4,8 @@ Tests vector similarity search with pgvector.
 Embedding generation is mocked to control similarity matching.
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

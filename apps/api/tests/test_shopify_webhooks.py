@@ -12,20 +12,19 @@ import base64
 import hashlib
 import hmac
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.shopify.webhooks import verify_webhook
-from app.models.integration import IntegrationStatus, PlatformType, StoreIntegration
+from app.models.integration import IntegrationStatus, PlatformType
 from app.models.product import Product
 from app.models.store import Store
 from tests.conftest import SHOPIFY_TEST_CLIENT_SECRET, SHOPIFY_TEST_SHOP
-
 
 # ---------------------------------------------------------------------------
 # Unit Tests: verify_webhook
@@ -77,7 +76,7 @@ class TestVerifyWebhook:
 
     def test_unicode_body(self) -> None:
         """verify_webhook handles unicode content in body."""
-        body = '{"title": "日本語テスト"}'.encode("utf-8")
+        body = '{"title": "日本語テスト"}'.encode()
         signature = self._compute_signature(body, SHOPIFY_TEST_CLIENT_SECRET)
 
         assert verify_webhook(body, signature, SHOPIFY_TEST_CLIENT_SECRET) is True
@@ -186,7 +185,7 @@ class TestProductsCreateWebhook:
         store: Store,
         integration_factory: Callable[..., Any],
         shopify_webhook_headers: Callable[[bytes, str], dict[str, str]],
-        mock_celery_shopify_tasks: dict[str, MagicMock],
+        _mock_celery_shopify_tasks: dict[str, MagicMock],
     ) -> None:
         """Returns {"status": "accepted"} on success."""
         await integration_factory(

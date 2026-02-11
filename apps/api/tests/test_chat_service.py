@@ -5,7 +5,8 @@ All OpenAI calls are mocked.
 """
 
 import uuid
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -28,8 +29,8 @@ class TestChatServiceProcessMessage:
         self,
         db_session: AsyncSession,
         store: Store,
-        mock_openai_chat: MagicMock,
-        mock_embedding_service: MagicMock,
+        _mock_openai_chat: MagicMock,
+        _mock_embedding_service: MagicMock,
     ) -> None:
         """process_message creates conversation, user message, and assistant message."""
         service = ChatService(db_session)
@@ -69,8 +70,8 @@ class TestChatServiceProcessMessage:
         db_session: AsyncSession,
         store: Store,
         conversation_factory: Callable[..., Any],
-        mock_openai_chat: MagicMock,
-        mock_embedding_service: MagicMock,
+        _mock_openai_chat: MagicMock,
+        _mock_embedding_service: MagicMock,
     ) -> None:
         """Providing conversation_id reuses existing conversation."""
         existing_conv = await conversation_factory(store_id=store.id)
@@ -90,8 +91,8 @@ class TestChatServiceProcessMessage:
         self,
         db_session: AsyncSession,
         store: Store,
-        mock_openai_chat: MagicMock,
-        mock_embedding_service: MagicMock,
+        _mock_openai_chat: MagicMock,
+        _mock_embedding_service: MagicMock,
     ) -> None:
         """Token usage from OpenAI is stored in the assistant message."""
         service = ChatService(db_session)
@@ -110,7 +111,7 @@ class TestChatServiceProcessMessage:
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        mock_openai_chat: MagicMock,
+        _mock_openai_chat: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Sources from RAG are stored in the assistant message."""
@@ -153,8 +154,8 @@ class TestChatServiceProcessMessage:
         store: Store,
         conversation_factory: Callable[..., Any],
         message_factory: Callable[..., Any],
-        mock_openai_chat: MagicMock,
-        mock_embedding_service: MagicMock,
+        _mock_openai_chat: MagicMock,
+        _mock_embedding_service: MagicMock,
     ) -> None:
         """Repeated messages in history are all included (regression test for dedup bug)."""
         conv = await conversation_factory(store_id=store.id)
@@ -189,7 +190,7 @@ class TestChatServiceProcessMessage:
         self,
         db_session: AsyncSession,
         store: Store,
-        mock_embedding_service: MagicMock,
+        _mock_embedding_service: MagicMock,
     ) -> None:
         """OpenAI API failure raises HTTPException with 503."""
         from fastapi import HTTPException

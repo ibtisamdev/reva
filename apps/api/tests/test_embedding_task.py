@@ -4,7 +4,8 @@ Tests the async function _process_article_embeddings_async directly
 to avoid needing a Celery worker.
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,12 +21,12 @@ class TestProcessArticleEmbeddings:
     @pytest.mark.asyncio
     async def test_fills_chunks_without_embeddings(
         self,
-        db_session: AsyncSession,
+        _db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        mock_knowledge_embedding_service: MagicMock,
-        mock_embedding: list[float],
+        _mock_knowledge_embedding_service: MagicMock,
+        _mock_embedding: list[float],
     ) -> None:
         """Chunks without embeddings are filled."""
         article = await knowledge_article_factory(
@@ -56,12 +57,12 @@ class TestProcessArticleEmbeddings:
     @pytest.mark.asyncio
     async def test_returns_correct_count(
         self,
-        db_session: AsyncSession,
+        _db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        mock_knowledge_embedding_service: MagicMock,
-        mock_embedding: list[float],
+        _mock_knowledge_embedding_service: MagicMock,
+        _mock_embedding: list[float],
     ) -> None:
         """Returns correct count of processed chunks."""
         article = await knowledge_article_factory(
@@ -85,11 +86,11 @@ class TestProcessArticleEmbeddings:
     @pytest.mark.asyncio
     async def test_skips_chunks_with_embeddings(
         self,
-        db_session: AsyncSession,
+        _db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        mock_knowledge_embedding_service: MagicMock,
+        _mock_knowledge_embedding_service: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Chunks that already have embeddings are skipped."""
@@ -120,11 +121,11 @@ class TestProcessArticleEmbeddings:
     @pytest.mark.asyncio
     async def test_returns_zero_when_no_chunks_to_process(
         self,
-        db_session: AsyncSession,
+        _db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        mock_knowledge_embedding_service: MagicMock,
+        _mock_knowledge_embedding_service: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Returns 0 when all chunks already have embeddings."""
@@ -149,10 +150,10 @@ class TestProcessArticleEmbeddings:
     @pytest.mark.asyncio
     async def test_handles_article_with_no_chunks(
         self,
-        db_session: AsyncSession,
+        _db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
-        mock_knowledge_embedding_service: MagicMock,
+        _mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Article with no chunks returns 0 processed."""
         article = await knowledge_article_factory(

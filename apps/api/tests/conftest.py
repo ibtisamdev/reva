@@ -1000,7 +1000,7 @@ def mock_url_fetch() -> Generator[MagicMock, None, None]:
     """
     with patch("app.services.url_service.fetch_url_content") as mock_fetch:
 
-        async def mock_fetch_async(url: str) -> tuple[str, str]:
+        async def mock_fetch_async(_url: str) -> tuple[str, str]:
             return ("This is extracted content from the URL.", "Page Title")
 
         mock_fetch.side_effect = mock_fetch_async
