@@ -44,7 +44,6 @@ get-reva/
 │   │   │   │   └── chains/     # LangChain chains
 │   │   │   ├── integrations/   # External services
 │   │   │   │   ├── shopify/
-│   │   │   │   ├── aftership/
 │   │   │   │   └── resend/
 │   │   │   ├── knowledge/      # RAG pipeline
 │   │   │   │   ├── ingestion.py
@@ -202,9 +201,9 @@ get-reva/
 - [ ] Order status -> friendly message mapping
 
 ### 2.3 Shipping Integration
-- [ ] AfterShip API integration
+- [ ] Shopify fulfillment tracking extraction
 - [ ] Tracking status parsing
-- [ ] Carrier-specific status mapping
+- [ ] Fulfillment status → friendly message mapping
 
 ### 2.4 Agent Enhancement
 - [ ] Intent classification (Q&A vs Order Status)
