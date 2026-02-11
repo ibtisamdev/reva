@@ -533,9 +533,9 @@ class TestCallbackRoute:
         store: Store,
         fake_redis: Any,
         shopify_oauth_hmac: Callable[[dict[str, str]], str],
-        _mock_shopify_token_exchange: MagicMock,
-        _mock_shopify_client: MagicMock,
-        _mock_celery_shopify_tasks: dict[str, MagicMock],
+        mock_shopify_token_exchange: MagicMock,
+        mock_shopify_client: MagicMock,
+        mock_celery_shopify_tasks: dict[str, MagicMock],
         db_session: Any,
     ) -> None:
         """Creates StoreIntegration with status ACTIVE."""
@@ -578,9 +578,9 @@ class TestCallbackRoute:
         integration_factory: Callable[..., Any],
         fake_redis: Any,
         shopify_oauth_hmac: Callable[[dict[str, str]], str],
-        _mock_shopify_token_exchange: MagicMock,
-        _mock_shopify_client: MagicMock,
-        _mock_celery_shopify_tasks: dict[str, MagicMock],
+        mock_shopify_token_exchange: MagicMock,
+        mock_shopify_client: MagicMock,
+        mock_celery_shopify_tasks: dict[str, MagicMock],
         db_session: Any,
     ) -> None:
         """Existing integration is updated, not duplicated."""
@@ -633,8 +633,8 @@ class TestCallbackRoute:
         store: Store,
         fake_redis: Any,
         shopify_oauth_hmac: Callable[[dict[str, str]], str],
-        _mock_shopify_token_exchange: MagicMock,
-        _mock_shopify_client: MagicMock,
+        mock_shopify_token_exchange: MagicMock,
+        mock_shopify_client: MagicMock,
         mock_celery_shopify_tasks: dict[str, MagicMock],
     ) -> None:
         """sync_products_full.delay() is called after successful callback."""
@@ -695,9 +695,9 @@ class TestCallbackRoute:
         store: Store,
         fake_redis: Any,
         shopify_oauth_hmac: Callable[[dict[str, str]], str],
-        _mock_shopify_token_exchange: MagicMock,
-        _mock_shopify_client: MagicMock,
-        _mock_celery_shopify_tasks: dict[str, MagicMock],
+        mock_shopify_token_exchange: MagicMock,
+        mock_shopify_client: MagicMock,
+        mock_celery_shopify_tasks: dict[str, MagicMock],
         db_session: Any,
     ) -> None:
         """Stored credentials contain encrypted token (not plaintext)."""
@@ -768,7 +768,7 @@ class TestDisconnectRoute:
         client: AsyncClient,
         store: Store,
         integration_factory: Callable[..., Any],
-        _mock_shopify_client: MagicMock,
+        mock_shopify_client: MagicMock,
         db_session: Any,
     ) -> None:
         """Sets status to DISCONNECTED and clears credentials."""

@@ -27,7 +27,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Article is created with all provided fields."""
         service = KnowledgeService(db_session)
@@ -54,7 +54,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Content is chunked and chunks are created."""
         service = KnowledgeService(db_session)
@@ -83,7 +83,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Content hash is computed as SHA-256."""
         service = KnowledgeService(db_session)
@@ -107,7 +107,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """With process_sync=True, chunks have embeddings."""
@@ -134,7 +134,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """With process_sync=False, chunks have no embeddings."""
         service = KnowledgeService(db_session)
@@ -161,7 +161,7 @@ class TestIngestText:
         self,
         db_session: AsyncSession,
         store: Store,
-        _mock_knowledge_embedding_service_failure: MagicMock,
+        mock_knowledge_embedding_service_failure: MagicMock,
     ) -> None:
         """When embedding generation fails, article is created and failure flag is set.
 
@@ -272,7 +272,7 @@ class TestProcessArticleEmbeddings:
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Chunks without embeddings get filled."""
@@ -319,7 +319,7 @@ class TestProcessArticleEmbeddings:
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Chunks that already have embeddings are not re-processed."""
@@ -354,7 +354,7 @@ class TestProcessArticleEmbeddings:
         db_session: AsyncSession,
         store: Store,
         knowledge_article_factory: Callable[..., Any],
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Returns 0 when article has no chunks."""
         article = await knowledge_article_factory(

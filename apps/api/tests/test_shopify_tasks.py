@@ -312,7 +312,7 @@ class TestSyncProductsFullAsync:
         integration_factory: Callable[..., Any],
         sample_shopify_products: list[dict[str, Any]],
         db_session: AsyncSession,
-        _mock_embedding_service_for_tasks: MagicMock,
+        mock_embedding_service_for_tasks: MagicMock,
     ) -> None:
         """Fetches products from Shopify and upserts to DB."""
         from app.workers.tasks.shopify import _sync_products_full_async

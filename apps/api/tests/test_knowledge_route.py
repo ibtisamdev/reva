@@ -26,7 +26,7 @@ class TestIngestText:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Successfully ingests text content and creates article with chunks."""
         response = await client.post(
@@ -51,7 +51,7 @@ class TestIngestText:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Duplicate content returns 409 Conflict."""
         content = "This is unique content that will be duplicated."
@@ -78,7 +78,7 @@ class TestIngestText:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Large documents (>5000 tokens) trigger async processing."""
         # Create content that exceeds 5000 tokens (~20k chars)
@@ -121,7 +121,7 @@ class TestIngestText:
         self,
         client: AsyncClient,
         other_store: Store,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Cannot ingest to a store in another organization."""
         response = await client.post(
@@ -139,7 +139,7 @@ class TestIngestText:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_knowledge_embedding_service_failure: MagicMock,
+        mock_knowledge_embedding_service_failure: MagicMock,
     ) -> None:
         """When embedding fails, response has status='error'."""
         response = await client.post(
@@ -196,8 +196,8 @@ class TestIngestUrl:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_url_fetch: MagicMock,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_url_fetch: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Successfully fetches URL and creates article."""
         response = await client.post(
@@ -219,8 +219,8 @@ class TestIngestUrl:
         self,
         client: AsyncClient,
         store: Store,
-        _mock_url_fetch: MagicMock,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_url_fetch: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Custom title overrides extracted page title."""
         response = await client.post(
@@ -303,8 +303,8 @@ class TestIngestPdf:
         client: AsyncClient,
         store: Store,
         sample_pdf_bytes: bytes,
-        _mock_pdf_extract: MagicMock,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_pdf_extract: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Successfully uploads PDF and creates article."""
         response = await client.post(
@@ -325,8 +325,8 @@ class TestIngestPdf:
         client: AsyncClient,
         store: Store,
         sample_pdf_bytes: bytes,
-        _mock_pdf_extract: MagicMock,
-        _mock_knowledge_embedding_service: MagicMock,
+        mock_pdf_extract: MagicMock,
+        mock_knowledge_embedding_service: MagicMock,
     ) -> None:
         """Custom title overrides filename-based title."""
         response = await client.post(

@@ -26,8 +26,8 @@ class TestSendMessage:
         self,
         unauthed_client: AsyncClient,
         store: Store,
-        _mock_openai_chat: MagicMock,
-        _mock_embedding_service: MagicMock,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """First message creates a new conversation and returns AI response."""
         response = await unauthed_client.post(
@@ -53,8 +53,8 @@ class TestSendMessage:
         unauthed_client: AsyncClient,
         store: Store,
         conversation_factory: Callable[..., Any],
-        _mock_openai_chat: MagicMock,
-        _mock_embedding_service: MagicMock,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """Message with conversation_id continues existing conversation."""
         existing_conv = await conversation_factory(store_id=store.id)
@@ -76,8 +76,8 @@ class TestSendMessage:
         self,
         unauthed_client: AsyncClient,
         store: Store,
-        _mock_openai_chat: MagicMock,
-        _mock_embedding_service: MagicMock,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """Session ID is preserved for widget tracking."""
         response = await unauthed_client.post(
@@ -98,8 +98,8 @@ class TestSendMessage:
         self,
         unauthed_client: AsyncClient,
         store: Store,
-        _mock_openai_chat: MagicMock,
-        _mock_embedding_service: MagicMock,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """Context data (page URL, etc.) is accepted."""
         response = await unauthed_client.post(
@@ -182,8 +182,8 @@ class TestSendMessage:
         self,
         unauthed_client: AsyncClient,
         store: Store,
-        _mock_openai_chat: MagicMock,
-        _mock_embedding_service: MagicMock,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """Non-existent conversation_id creates a new conversation (doesn't 404)."""
         fake_conv_id = str(uuid.uuid4())
@@ -208,7 +208,7 @@ class TestSendMessage:
         store: Store,
         knowledge_article_factory: Callable[..., Any],
         knowledge_chunk_factory: Callable[..., Any],
-        _mock_openai_chat: MagicMock,
+        mock_openai_chat: MagicMock,
         mock_embedding: list[float],
     ) -> None:
         """Response includes sources when knowledge chunks match."""
@@ -244,7 +244,7 @@ class TestSendMessage:
         self,
         unauthed_client: AsyncClient,
         store: Store,
-        _mock_embedding_service: MagicMock,
+        mock_embedding_service: MagicMock,
     ) -> None:
         """OpenAI API failure returns 503 Service Unavailable."""
         with patch("app.services.chat_service.AsyncOpenAI") as mock_class:

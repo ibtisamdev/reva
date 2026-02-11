@@ -185,7 +185,7 @@ class TestProductsCreateWebhook:
         store: Store,
         integration_factory: Callable[..., Any],
         shopify_webhook_headers: Callable[[bytes, str], dict[str, str]],
-        _mock_celery_shopify_tasks: dict[str, MagicMock],
+        mock_celery_shopify_tasks: dict[str, MagicMock],
     ) -> None:
         """Returns {"status": "accepted"} on success."""
         await integration_factory(
