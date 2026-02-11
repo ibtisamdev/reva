@@ -1,5 +1,6 @@
 """Chat API endpoints for the widget."""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -33,7 +34,9 @@ router = APIRouter()
 # === Auth Helpers ===
 
 
-def _verify_store_access(store: Store, user: dict | None, session_id: str | None) -> str | None:
+def _verify_store_access(
+    store: Store, user: dict[str, Any] | None, session_id: str | None
+) -> str | None:
     """Check access to a store's conversations.
 
     Returns the session_id to scope queries to (None means no scoping — full access).
