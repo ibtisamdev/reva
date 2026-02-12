@@ -3,6 +3,7 @@
 from typing import Any
 from uuid import UUID
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -12,6 +13,7 @@ from app.core.deps import (
     CurrentUser,
     DBSession,
     OptionalUser,
+    get_redis,
     get_store_by_id,
     get_user_organization_id,
 )
@@ -117,12 +119,10 @@ async def send_message(
     request: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
+    redis: aioredis.Redis = Depends(get_redis),
     _user: OptionalUser = None,  # Reserved for future use (e.g., linking to customer)
 ) -> ChatResponse:
-    """Send a message and get an AI response.
-
-    TODO: Add streaming support in Phase 2 via SSE endpoint.
-    """
+    """Send a message and get an AI response."""
     service = ChatService(db)
 
     # Use session_id from request or None (service will generate one)
@@ -132,6 +132,7 @@ async def send_message(
         store=store,
         request=request,
         session_id=session_id,
+        redis_client=redis,
     )
 
     return response

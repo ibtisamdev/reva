@@ -174,7 +174,9 @@ class TestChatServiceProcessMessage:
         original_generate = service._generate_response
         captured_history: list[Message] = []
 
-        async def capture_generate(*args: Any, **kwargs: Any) -> tuple[str, int]:
+        async def capture_generate(
+            *args: Any, **kwargs: Any
+        ) -> tuple[str, int, list[dict[str, Any]] | None, list[dict[str, Any]] | None]:
             captured_history.extend(kwargs.get("conversation_history", []))
             return await original_generate(*args, **kwargs)
 
@@ -195,12 +197,11 @@ class TestChatServiceProcessMessage:
         """OpenAI API failure raises HTTPException with 503."""
         from fastapi import HTTPException
 
-        with patch("app.services.chat_service.AsyncOpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create = AsyncMock(
-                side_effect=Exception("OpenAI API error")
-            )
+        with patch("app.services.chat_service.ChatOpenAI") as mock_class:
+            mock_llm = MagicMock()
+            mock_class.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(side_effect=Exception("OpenAI API error"))
+            mock_llm.bind_tools = MagicMock(return_value=mock_llm)
 
             service = ChatService(db_session)
             request = ChatRequest(message="Hello")

@@ -224,3 +224,43 @@ export interface ProductImage {
   alt: string | null;
   position: number;
 }
+
+// === WISMO Analytics ===
+
+export type InquiryType =
+  | 'order_status'
+  | 'tracking'
+  | 'delivery_eta'
+  | 'missing_package'
+  | 'other';
+
+export type InquiryResolution =
+  | 'answered'
+  | 'tracking_provided'
+  | 'escalated'
+  | 'unresolved'
+  | 'verification_failed';
+
+export interface WismoSummary {
+  total_inquiries: number;
+  resolution_rate: number;
+  avg_per_day: number;
+  period_days: number;
+}
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface OrderInquiry {
+  id: string;
+  customer_email: string | null;
+  order_number: string | null;
+  inquiry_type: InquiryType;
+  order_status: string | null;
+  fulfillment_status: string | null;
+  resolution: InquiryResolution | null;
+  created_at: string;
+  resolved_at: string | null;
+}

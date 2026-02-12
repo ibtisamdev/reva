@@ -121,7 +121,7 @@ async def callback(
 
     # Exchange code for access token
     try:
-        access_token = await exchange_code_for_token(shop, code)
+        access_token, granted_scopes = await exchange_code_for_token(shop, code)
     except httpx.HTTPStatusError:
         return RedirectResponse(
             f"{settings.frontend_url}/dashboard/settings/integrations?error=token_exchange_failed"
@@ -133,11 +133,13 @@ async def callback(
     result = await db.execute(stmt)
     integration = result.scalar_one_or_none()
 
+    credentials = {"access_token": encrypted_token, "granted_scopes": granted_scopes}
+
     if integration:
         integration.platform = PlatformType.SHOPIFY
         integration.platform_store_id = shop
         integration.platform_domain = shop
-        integration.credentials = {"access_token": encrypted_token}
+        integration.credentials = credentials
         integration.status = IntegrationStatus.ACTIVE
         integration.sync_error = None
     else:
@@ -146,7 +148,7 @@ async def callback(
             platform=PlatformType.SHOPIFY,
             platform_store_id=shop,
             platform_domain=shop,
-            credentials={"access_token": encrypted_token},
+            credentials=credentials,
             status=IntegrationStatus.ACTIVE,
         )
         db.add(integration)

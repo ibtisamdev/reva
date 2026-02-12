@@ -247,12 +247,11 @@ class TestSendMessage:
         mock_embedding_service: MagicMock,
     ) -> None:
         """OpenAI API failure returns 503 Service Unavailable."""
-        with patch("app.services.chat_service.AsyncOpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create = AsyncMock(
-                side_effect=Exception("OpenAI API is down")
-            )
+        with patch("app.services.chat_service.ChatOpenAI") as mock_class:
+            mock_llm = MagicMock()
+            mock_class.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(side_effect=Exception("OpenAI API is down"))
+            mock_llm.bind_tools = MagicMock(return_value=mock_llm)
 
             response = await unauthed_client.post(
                 "/api/v1/chat/messages",
