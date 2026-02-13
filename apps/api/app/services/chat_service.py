@@ -101,19 +101,28 @@ class ChatService:
         )
 
         # Retrieve relevant context (knowledge + products)
-        chunks = await self.retrieval_service.retrieve_context(
-            query=request.message,
-            store_id=store.id,
-            top_k=5,
-            threshold=0.5,
-        )
+        # Wrapped in try/except so chat continues with empty context if embedding fails
+        try:
+            chunks = await self.retrieval_service.retrieve_context(
+                query=request.message,
+                store_id=store.id,
+                top_k=5,
+                threshold=0.5,
+            )
+        except Exception:
+            logger.exception("Failed to retrieve context for store %s", store.id)
+            chunks = []
 
-        products = await self.retrieval_service.retrieve_products(
-            query=request.message,
-            store_id=store.id,
-            top_k=3,
-            threshold=0.5,
-        )
+        try:
+            products = await self.retrieval_service.retrieve_products(
+                query=request.message,
+                store_id=store.id,
+                top_k=3,
+                threshold=0.5,
+            )
+        except Exception:
+            logger.exception("Failed to retrieve products for store %s", store.id)
+            products = []
 
         # Create order tools when redis is available
         tools = None

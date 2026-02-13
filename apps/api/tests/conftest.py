@@ -1061,3 +1061,69 @@ def mock_pdf_extract() -> Generator[MagicMock, None, None]:
     with patch("app.services.pdf_service.extract_text_from_pdf") as mock_extract:
         mock_extract.return_value = "This is extracted text from the PDF document."
         yield mock_extract
+
+
+# ---------------------------------------------------------------------------
+# Order Service Testing Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sample_shopify_order() -> dict[str, Any]:
+    """A sample Shopify order JSON as returned by the Admin API.
+
+    Includes line items, customer info, shipping address, and financial/fulfillment status.
+    """
+    return {
+        "id": 5551234567890,
+        "name": "#1001",
+        "email": "customer@example.com",
+        "financial_status": "paid",
+        "fulfillment_status": None,
+        "created_at": "2024-06-15T10:30:00-04:00",
+        "total_price": "79.98",
+        "currency": "USD",
+        "cancelled_at": None,
+        "customer": {
+            "first_name": "Jane",
+            "last_name": "Doe",
+        },
+        "shipping_address": {
+            "city": "New York",
+            "province": "NY",
+        },
+        "line_items": [
+            {
+                "title": "Widget Pro",
+                "quantity": 2,
+                "price": "39.99",
+                "variant_title": "Blue / Large",
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def sample_fulfillments() -> list[dict[str, Any]]:
+    """Sample fulfillment data as returned by Shopify's order fulfillments endpoint."""
+    return [
+        {
+            "status": "success",
+            "tracking_number": "1Z999AA10123456784",
+            "tracking_url": "https://wwwapps.ups.com/tracking/tracking.cgi?tracknum=1Z999AA10123456784",
+            "tracking_company": "UPS",
+            "shipment_status": "delivered",
+            "created_at": "2024-06-16T14:00:00-04:00",
+        },
+    ]
+
+
+@pytest.fixture
+def mock_decrypt_token() -> Generator[MagicMock, None, None]:
+    """Patch decrypt_token in the order_service module to return a fixed token.
+
+    Prevents tests from needing real encryption keys.
+    """
+    with patch("app.services.order_service.decrypt_token") as mock_fn:
+        mock_fn.return_value = "shpat_decrypted_test_token"
+        yield mock_fn

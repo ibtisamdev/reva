@@ -30,11 +30,14 @@ describe('Sidebar', () => {
     expect(screen.getByText('Reva')).toBeInTheDocument();
   });
 
-  it('renders 4 navigation links', () => {
+  it('renders 7 navigation links', () => {
     render(<Sidebar />);
     expect(screen.getByText('Overview')).toBeInTheDocument();
     expect(screen.getByText('Conversations')).toBeInTheDocument();
+    expect(screen.getByText('Order Inquiries')).toBeInTheDocument();
+    expect(screen.getByText('Products')).toBeInTheDocument();
     expect(screen.getByText('Knowledge Base')).toBeInTheDocument();
+    expect(screen.getByText('Integrations')).toBeInTheDocument();
     expect(screen.getByText('Widget Settings')).toBeInTheDocument();
   });
 

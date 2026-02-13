@@ -115,8 +115,8 @@ async def _get_authenticated_store(
 )
 @limiter.limit("10/minute")
 async def send_message(
-    http_request: Request,  # noqa: ARG001 — required by slowapi
-    request: ChatRequest,
+    request: Request,
+    body: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
     redis: aioredis.Redis = Depends(get_redis),
@@ -125,12 +125,12 @@ async def send_message(
     """Send a message and get an AI response."""
     service = ChatService(db)
 
-    # Use session_id from request or None (service will generate one)
-    session_id = request.session_id
+    # Use session_id from body or None (service will generate one)
+    session_id = body.session_id
 
     response = await service.process_message(
         store=store,
-        request=request,
+        request=body,
         session_id=session_id,
         redis_client=redis,
     )

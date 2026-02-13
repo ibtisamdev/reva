@@ -408,3 +408,341 @@ class TestChatServiceBuildSystemPrompt:
         assert "Test Store" in prompt
         # Citation service returns "No relevant context found." for empty chunks
         assert "No relevant context found" in prompt or "No matching products" in prompt
+
+    def test_includes_order_instructions_when_tools_available(self) -> None:
+        """System prompt includes order instructions when has_order_tools=True."""
+        service = ChatService(MagicMock())
+
+        prompt = service._build_system_prompt("Test Store", [], [], has_order_tools=True)
+
+        assert "ORDER STATUS INSTRUCTIONS" in prompt
+        assert "verification" in prompt.lower()
+
+    def test_excludes_order_instructions_when_no_tools(self) -> None:
+        """System prompt omits order instructions when has_order_tools=False."""
+        service = ChatService(MagicMock())
+
+        prompt = service._build_system_prompt("Test Store", [], [], has_order_tools=False)
+
+        assert "ORDER STATUS INSTRUCTIONS" not in prompt
+
+
+class TestChatServiceOrderToolIntegration:
+    """Tests for order tool creation within ChatService.process_message()."""
+
+    @pytest.mark.asyncio
+    async def test_tools_created_when_redis_provided(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
+        fake_redis: Any,
+    ) -> None:
+        """Order tools are created when redis_client is provided."""
+        service = ChatService(db_session)
+        request = ChatRequest(message="Where is my order #1001?")
+
+        with patch("app.services.order_service.OrderService") as mock_os_cls, patch(
+            "app.services.order_tools.create_order_tools"
+        ) as mock_cot:
+            mock_cot.return_value = [MagicMock(name="tool1")]
+
+            await service.process_message(store, request, redis_client=fake_redis)
+
+            mock_os_cls.assert_called_once_with(db_session, fake_redis)
+            mock_cot.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_tools_without_redis(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
+    ) -> None:
+        """Order tools are NOT created when redis_client is None."""
+        service = ChatService(db_session)
+        request = ChatRequest(message="What are your hours?")
+
+        with patch("app.services.order_tools.create_order_tools") as mock_cot:
+            await service.process_message(store, request, redis_client=None)
+
+            mock_cot.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tool_creation_failure_handled_gracefully(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        mock_openai_chat: MagicMock,
+        mock_embedding_service: MagicMock,
+        fake_redis: Any,
+    ) -> None:
+        """Tool creation failure is logged but doesn't crash the request."""
+        service = ChatService(db_session)
+        request = ChatRequest(message="Hello")
+
+        with patch(
+            "app.services.order_tools.create_order_tools",
+            side_effect=Exception("Tool creation failed"),
+        ):
+            # Should not raise — falls back to no tools
+            response = await service.process_message(store, request, redis_client=fake_redis)
+
+        assert response.response == "This is a mock AI response for testing."
+
+
+class TestChatServiceMaybeRecordOrderInquiry:
+    """Tests for ChatService._maybe_record_order_inquiry()."""
+
+    @pytest.mark.asyncio
+    async def test_records_on_successful_verification(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Records OrderInquiry when verification succeeds."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "verify_customer_and_lookup_order",
+                    "args": {"order_number": "#1001", "email": "test@example.com"},
+                }
+            ],
+            tool_results=[
+                {
+                    "tool_call_id": "call_1",
+                    "result": '{"verified": true, "order": {"financial_status": "paid", "fulfillment_status": "fulfilled"}, "message": "verified"}',
+                }
+            ],
+        )
+        await db_session.flush()
+
+        from sqlalchemy import select
+
+        from app.models.order_inquiry import InquiryResolution, OrderInquiry
+
+        result = await db_session.execute(
+            select(OrderInquiry).where(OrderInquiry.store_id == store.id)
+        )
+        inquiry = result.scalar_one_or_none()
+
+        assert inquiry is not None
+        assert inquiry.order_number == "#1001"
+        assert inquiry.customer_email == "test@example.com"
+        assert inquiry.resolution == InquiryResolution.ANSWERED
+        assert inquiry.order_status == "paid"
+        assert inquiry.fulfillment_status == "fulfilled"
+
+    @pytest.mark.asyncio
+    async def test_records_verification_failure(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Records OrderInquiry when verification fails."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "verify_customer_and_lookup_order",
+                    "args": {"order_number": "#1001", "email": "wrong@example.com"},
+                }
+            ],
+            tool_results=[
+                {
+                    "tool_call_id": "call_1",
+                    "result": '{"verified": false, "message": "Email mismatch"}',
+                }
+            ],
+        )
+        await db_session.flush()
+
+        from sqlalchemy import select
+
+        from app.models.order_inquiry import InquiryResolution, OrderInquiry
+
+        result = await db_session.execute(
+            select(OrderInquiry).where(OrderInquiry.store_id == store.id)
+        )
+        inquiry = result.scalar_one_or_none()
+
+        assert inquiry is not None
+        assert inquiry.resolution == InquiryResolution.VERIFICATION_FAILED
+        assert inquiry.order_status is None
+
+    @pytest.mark.asyncio
+    async def test_skips_non_verification_tools(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Does not record inquiry for non-verification tool calls."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "lookup_order_status",
+                    "args": {"order_number": "#1001"},
+                }
+            ],
+            tool_results=[
+                {
+                    "tool_call_id": "call_1",
+                    "result": '{"order_number": "#1001"}',
+                }
+            ],
+        )
+        await db_session.flush()
+
+        from sqlalchemy import func, select
+
+        from app.models.order_inquiry import OrderInquiry
+
+        count = (
+            await db_session.execute(
+                select(func.count()).select_from(OrderInquiry).where(OrderInquiry.store_id == store.id)
+            )
+        ).scalar()
+        assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_handles_malformed_json_result(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Handles malformed JSON in tool results gracefully."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        # Should not raise — just creates inquiry with empty result_data
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "verify_customer_and_lookup_order",
+                    "args": {"order_number": "#1001", "email": "test@test.com"},
+                }
+            ],
+            tool_results=[
+                {
+                    "tool_call_id": "call_1",
+                    "result": "not valid json {{{",
+                }
+            ],
+        )
+        await db_session.flush()
+
+        from sqlalchemy import select
+
+        from app.models.order_inquiry import OrderInquiry
+
+        result = await db_session.execute(
+            select(OrderInquiry).where(OrderInquiry.store_id == store.id)
+        )
+        inquiry = result.scalar_one_or_none()
+        assert inquiry is not None
+        # verified defaults to False when JSON parsing fails
+        assert inquiry.order_status is None
+
+    @pytest.mark.asyncio
+    async def test_correct_email_and_order_extraction(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Extracts email and order_number from tool call args."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "verify_customer_and_lookup_order",
+                    "args": {"order_number": "#2002", "email": "specific@email.com"},
+                }
+            ],
+            tool_results=[
+                {
+                    "tool_call_id": "call_1",
+                    "result": '{"verified": true, "order": {}, "message": "ok"}',
+                }
+            ],
+        )
+        await db_session.flush()
+
+        from sqlalchemy import select
+
+        from app.models.order_inquiry import OrderInquiry
+
+        result = await db_session.execute(
+            select(OrderInquiry).where(OrderInquiry.store_id == store.id)
+        )
+        inquiry = result.scalar_one_or_none()
+
+        assert inquiry is not None
+        assert inquiry.customer_email == "specific@email.com"
+        assert inquiry.order_number == "#2002"
+
+    @pytest.mark.asyncio
+    async def test_handles_none_tool_results(
+        self,
+        db_session: AsyncSession,
+        store: Store,
+        conversation_factory: Callable[..., Any],
+    ) -> None:
+        """Handles None tool_results gracefully."""
+        conv = await conversation_factory(store_id=store.id)
+
+        service = ChatService(db_session)
+        await service._maybe_record_order_inquiry(
+            store_id=store.id,
+            conversation_id=conv.id,
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "name": "verify_customer_and_lookup_order",
+                    "args": {"order_number": "#1001", "email": "test@test.com"},
+                }
+            ],
+            tool_results=None,
+        )
+        await db_session.flush()
+
+        from sqlalchemy import select
+
+        from app.models.order_inquiry import OrderInquiry
+
+        result = await db_session.execute(
+            select(OrderInquiry).where(OrderInquiry.store_id == store.id)
+        )
+        inquiry = result.scalar_one_or_none()
+        assert inquiry is not None

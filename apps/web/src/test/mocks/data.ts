@@ -1,9 +1,11 @@
 import type {
   Conversation,
   ConversationDetail,
+  DailyCount,
   Message,
   KnowledgeArticle,
   KnowledgeArticleDetail,
+  OrderInquiry,
 
   Store,
   WidgetSettings,
@@ -13,6 +15,7 @@ import type {
   Product,
   ShopifyConnection,
   SyncStatus,
+  WismoSummary,
 } from '@/lib/api/types';
 
 export const mockStores: Store[] = [
@@ -234,3 +237,43 @@ export function mockPaginatedResponse<T>(items: T[], page = 1, pageSize = 20): P
     pages: Math.ceil(items.length / pageSize) || 1,
   };
 }
+
+// === WISMO Analytics ===
+
+export const mockWismoSummary: WismoSummary = {
+  total_inquiries: 42,
+  resolution_rate: 0.85,
+  avg_per_day: 1.4,
+  period_days: 30,
+};
+
+export const mockWismoTrend: DailyCount[] = [
+  { date: '2024-01-13', count: 2 },
+  { date: '2024-01-14', count: 5 },
+  { date: '2024-01-15', count: 3 },
+];
+
+export const mockWismoInquiries: OrderInquiry[] = [
+  {
+    id: 'inq-1',
+    customer_email: 'customer@example.com',
+    order_number: '#1001',
+    inquiry_type: 'order_status',
+    order_status: 'paid',
+    fulfillment_status: 'fulfilled',
+    resolution: 'answered',
+    created_at: '2024-01-15T10:00:00Z',
+    resolved_at: '2024-01-15T10:01:00Z',
+  },
+  {
+    id: 'inq-2',
+    customer_email: 'another@example.com',
+    order_number: '#1002',
+    inquiry_type: 'tracking',
+    order_status: 'paid',
+    fulfillment_status: null,
+    resolution: 'verification_failed',
+    created_at: '2024-01-14T08:00:00Z',
+    resolved_at: '2024-01-14T08:00:30Z',
+  },
+];
