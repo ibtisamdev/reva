@@ -104,4 +104,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_order_inquiries_order_number"), table_name="order_inquiries")
     op.drop_index(op.f("ix_order_inquiries_conversation_id"), table_name="order_inquiries")
     op.drop_table("order_inquiries")
+    sa.Enum(name="inquiry_type").drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name="inquiry_resolution").drop(op.get_bind(), checkfirst=True)
     # ### end Alembic commands ###

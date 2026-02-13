@@ -8,7 +8,7 @@ from sqlalchemy import case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.types import Date
 
-from app.models.order_inquiry import OrderInquiry
+from app.models.order_inquiry import InquiryResolution, OrderInquiry
 from app.schemas.analytics import DailyCount, OrderInquiryResponse, WismoSummary
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class WismoAnalyticsService:
             func.count().label("total"),
             func.count(
                 case(
-                    (OrderInquiry.resolution.is_not(None), 1),
+                    (OrderInquiry.resolution.in_([InquiryResolution.ANSWERED, InquiryResolution.TRACKING_PROVIDED]), 1),
                     else_=None,
                 )
             ).label("resolved"),

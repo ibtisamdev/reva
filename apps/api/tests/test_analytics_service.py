@@ -110,21 +110,24 @@ class TestGetSummary:
         assert summary.resolution_rate == 0.5
 
     @pytest.mark.asyncio
-    async def test_all_resolution_types_count_as_resolved(
+    async def test_only_successful_resolutions_count_as_resolved(
         self,
         db_session: AsyncSession,
         store: Store,
         order_inquiry_factory: Callable[..., Any],
     ) -> None:
-        """Any non-null resolution counts as resolved."""
+        """Only ANSWERED and TRACKING_PROVIDED count as resolved."""
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.ANSWERED)
+        await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.TRACKING_PROVIDED)
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.VERIFICATION_FAILED)
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.ESCALATED)
+        await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.UNRESOLVED)
 
         service = WismoAnalyticsService(db_session)
         summary = await service.get_summary(store.id, days=30)
 
-        assert summary.resolution_rate == 1.0
+        assert summary.total_inquiries == 5
+        assert summary.resolution_rate == round(2 / 5, 3)
 
 
 class TestGetDailyTrend:
