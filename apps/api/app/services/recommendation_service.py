@@ -26,6 +26,7 @@ class RecommendationService:
         product_id: UUID,
         store_id: UUID,
         limit: int = 5,
+        min_similarity: float = 0.35,
     ) -> list[ProductSearchResult]:
         """Find products similar to a given product using embedding cosine similarity.
 
@@ -33,6 +34,7 @@ class RecommendationService:
             product_id: Source product to find similar items for
             store_id: Scope to this store (multi-tenant)
             limit: Max number of similar products to return
+            min_similarity: Minimum cosine similarity threshold
 
         Returns:
             List of similar products sorted by similarity score
@@ -43,6 +45,7 @@ class RecommendationService:
             return []
 
         distance_expr = Product.embedding.cosine_distance(source.embedding)
+        max_distance = 1 - min_similarity
 
         stmt = (
             select(
@@ -54,6 +57,7 @@ class RecommendationService:
                 Product.id != product_id,
                 Product.status == "active",
                 Product.embedding.isnot(None),
+                distance_expr <= max_distance,
             )
             .order_by(distance_expr)
             .limit(limit)

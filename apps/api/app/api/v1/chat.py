@@ -28,7 +28,7 @@ from app.schemas.chat import (
     SourceReference,
 )
 from app.schemas.common import PaginatedResponse
-from app.services.chat_service import ChatService
+from app.services.chat_service import ChatService, extract_products_from_tool_results
 
 router = APIRouter()
 
@@ -75,10 +75,14 @@ async def _get_authenticated_store(
     """Get store for dashboard endpoints requiring authentication + org ownership."""
     org_id = get_user_organization_id(user)
 
-    query = select(Store).where(
-        Store.id == store_id,
-        Store.is_active == True,  # noqa: E712
-        Store.organization_id == org_id,
+    query = (
+        select(Store)
+        .where(
+            Store.id == store_id,
+            Store.is_active == True,  # noqa: E712
+            Store.organization_id == org_id,
+        )
+        .options(selectinload(Store.integration))
     )
     result = await db.execute(query)
     store = result.scalar_one_or_none()
@@ -178,12 +182,15 @@ async def get_conversation(
             detail="Conversation not found",
         )
 
+    store_domain = store.integration.platform_domain if store.integration else None
     messages = [
         MessageResponse(
             id=m.id,
             role=m.role,
             content=m.content,
             sources=[SourceReference(**s) for s in m.sources] if m.sources else None,
+            products=extract_products_from_tool_results(m.tool_results, store_domain=store_domain)
+            or None,
             tokens_used=m.tokens_used,
             created_at=m.created_at,
         )
@@ -261,6 +268,7 @@ async def list_conversations(
     result = await db.execute(query)
     conversations = result.scalars().all()
 
+    store_domain = store.integration.platform_domain if store.integration else None
     items = [
         ConversationDetailResponse(
             id=c.id,
@@ -278,6 +286,10 @@ async def list_conversations(
                     role=m.role,
                     content=m.content,
                     sources=[SourceReference(**s) for s in m.sources] if m.sources else None,
+                    products=extract_products_from_tool_results(
+                        m.tool_results, store_domain=store_domain
+                    )
+                    or None,
                     tokens_used=m.tokens_used,
                     created_at=m.created_at,
                 )
@@ -346,6 +358,7 @@ async def update_conversation_status(
     await db.commit()
     await db.refresh(conversation)
 
+    store_domain = store.integration.platform_domain if store.integration else None
     return ConversationDetailResponse(
         id=conversation.id,
         store_id=conversation.store_id,
@@ -362,6 +375,10 @@ async def update_conversation_status(
                 role=m.role,
                 content=m.content,
                 sources=[SourceReference(**s) for s in m.sources] if m.sources else None,
+                products=extract_products_from_tool_results(
+                    m.tool_results, store_domain=store_domain
+                )
+                or None,
                 tokens_used=m.tokens_used,
                 created_at=m.created_at,
             )

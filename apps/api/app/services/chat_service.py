@@ -16,6 +16,7 @@ from langchain_core.messages import (
     HumanMessage,
     ToolMessage,
 )
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +24,7 @@ from app.models.conversation import Channel, Conversation, ConversationStatus
 from app.models.message import Message, MessageRole
 from app.models.order_inquiry import InquiryResolution, InquiryType, OrderInquiry
 from app.models.store import Store
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import ChatRequest, ChatResponse, ProductCard
 from app.services.citation_service import CitationService
 from app.services.graph.workflow import create_sales_graph
 from app.services.retrieval_service import RetrievalService, RetrievedChunk, RetrievedProduct
@@ -34,6 +35,82 @@ logger = logging.getLogger(__name__)
 CHAT_MODEL = "gpt-4o"
 MAX_CONVERSATION_HISTORY = 10  # Last N messages to include
 MAX_RESPONSE_TOKENS = 800
+
+# Tools whose results contain product data
+_PRODUCT_TOOLS = {
+    "search_products",
+    "get_similar_products",
+    "compare_products",
+    "suggest_alternatives",
+}
+
+
+def extract_products_from_tool_results(
+    tool_results: list[dict[str, Any]] | None,
+    store_domain: str | None = None,
+) -> list[ProductCard]:
+    """Extract product cards from tool result records.
+
+    Parses JSON tool results and extracts product data from known formats:
+    - search_products / get_similar_products: {"results": [...]}
+    - compare_products: {"products": [...]}
+    - suggest_alternatives: {"upsells": [...], "cross_sells": [...]}
+
+    If store_domain is provided, constructs product_url from handle.
+    """
+    if not tool_results:
+        return []
+
+    products: list[ProductCard] = []
+    seen_ids: set[str] = set()
+
+    for tr in tool_results:
+        result_str = tr.get("result", "")
+        try:
+            data = json.loads(result_str)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        # Collect product dicts from the various tool response shapes
+        product_dicts: list[dict[str, Any]] = []
+
+        # search_products / get_similar_products: {"results": [...]}
+        if isinstance(data.get("results"), list):
+            product_dicts.extend(data["results"])
+
+        # compare_products: {"products": [...]}
+        if isinstance(data.get("products"), list):
+            product_dicts.extend(data["products"])
+
+        # suggest_alternatives: {"upsells": [...], "cross_sells": [...]}
+        for key in ("upsells", "cross_sells"):
+            if isinstance(data.get(key), list):
+                product_dicts.extend(data[key])
+
+        for p in product_dicts:
+            pid = p.get("product_id")
+            if not pid or pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+
+            # Construct product URL from store domain and handle
+            product_url = None
+            handle = p.get("handle")
+            if store_domain and handle:
+                product_url = f"https://{store_domain}/products/{handle}"
+
+            products.append(
+                ProductCard(
+                    product_id=pid,
+                    title=p.get("title", ""),
+                    price=p.get("price"),
+                    image_url=p.get("image_url"),
+                    in_stock=p.get("in_stock", True),
+                    product_url=product_url,
+                )
+            )
+
+    return products
 
 
 class ChatService:
@@ -177,6 +254,15 @@ class ChatService:
         # Create sources from chunks
         sources = self.citation_service.create_sources_from_chunks(chunks)
 
+        # Extract product cards from tool results
+        # Use sa_inspect to check if integration is loaded (avoids lazy load in async)
+        store_domain = None
+        if "integration" not in sa_inspect(store).unloaded:
+            store_domain = store.integration.platform_domain if store.integration else None
+        product_cards = extract_products_from_tool_results(
+            tool_results_record, store_domain=store_domain
+        )
+
         # Save assistant message
         assistant_message = await self._save_message(
             conversation_id=conversation.id,
@@ -195,6 +281,7 @@ class ChatService:
             message_id=assistant_message.id,
             response=response_content,
             sources=sources,
+            products=product_cards,
             created_at=assistant_message.created_at,
         )
 

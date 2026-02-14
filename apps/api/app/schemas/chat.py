@@ -22,6 +22,20 @@ class SourceReference(BaseSchema):
     chunk_id: UUID | None = None
 
 
+# === Product Card Schemas ===
+
+
+class ProductCard(BaseSchema):
+    """A product card extracted from tool results for widget display."""
+
+    product_id: str
+    title: str
+    price: str | None = None
+    image_url: str | None = None
+    in_stock: bool = True
+    product_url: str | None = None
+
+
 # === Message Schemas ===
 
 
@@ -39,6 +53,7 @@ class MessageResponse(BaseSchema):
     role: MessageRole
     content: str
     sources: list[SourceReference] | None = None
+    products: list[ProductCard] | None = None
     tokens_used: int | None = None
     created_at: datetime
 
@@ -85,4 +100,5 @@ class ChatResponse(BaseSchema):
     message_id: UUID
     response: str
     sources: list[SourceReference]
+    products: list[ProductCard] = Field(default_factory=list)
     created_at: datetime

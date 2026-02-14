@@ -17,6 +17,19 @@ export interface SourceReference {
 }
 
 /**
+ * A product card extracted from tool results.
+ * Matches: app/schemas/chat.py::ProductCard
+ */
+export interface Product {
+  product_id: string;
+  title: string;
+  price: string | null;
+  image_url: string | null;
+  in_stock: boolean;
+  product_url: string | null;
+}
+
+/**
  * Request payload for sending a chat message.
  * Matches: app/schemas/chat.py::ChatRequest
  */
@@ -36,6 +49,7 @@ export interface ChatResponse {
   message_id: string;
   response: string;
   sources: SourceReference[];
+  products: Product[];
   created_at: string;
 }
 
@@ -48,6 +62,7 @@ export interface MessageResponse {
   role: 'user' | 'assistant' | 'system';
   content: string;
   sources: SourceReference[] | null;
+  products: Product[] | null;
   tokens_used: number | null;
   created_at: string;
 }
@@ -80,6 +95,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: SourceReference[];
+  products?: Product[];
   isStreaming?: boolean;
 }
 

@@ -177,6 +177,154 @@
   border-bottom-left-radius: 4px;
 }
 
+/* === Markdown Content in Assistant Messages === */
+
+.reva-widget .reva-markdown > div > *:first-child {
+  margin-top: 0;
+}
+
+.reva-widget .reva-markdown > div > *:last-child {
+  margin-bottom: 0;
+}
+
+.reva-widget .reva-markdown p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.reva-widget .reva-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings - constrained for chat bubble */
+.reva-widget .reva-markdown h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+  line-height: 1.3;
+}
+
+.reva-widget .reva-markdown h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  line-height: 1.3;
+}
+
+.reva-widget .reva-markdown h5,
+.reva-widget .reva-markdown h6 {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 8px 0 4px;
+  line-height: 1.3;
+}
+
+.reva-widget .reva-markdown strong {
+  font-weight: 600;
+}
+
+.reva-widget .reva-markdown em {
+  font-style: italic;
+}
+
+/* Links */
+.reva-widget .reva-markdown a {
+  color: var(--reva-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.reva-widget .reva-markdown a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.reva-widget .reva-markdown a:focus-visible {
+  outline: 2px solid var(--reva-primary);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Lists */
+.reva-widget .reva-markdown ul,
+.reva-widget .reva-markdown ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.reva-widget .reva-markdown ul {
+  list-style-type: disc;
+}
+
+.reva-widget .reva-markdown ol {
+  list-style-type: decimal;
+}
+
+.reva-widget .reva-markdown li {
+  margin: 2px 0;
+  line-height: 1.5;
+}
+
+.reva-widget .reva-markdown li > p {
+  margin: 0;
+}
+
+.reva-widget .reva-markdown ul ul,
+.reva-widget .reva-markdown ol ol,
+.reva-widget .reva-markdown ul ol,
+.reva-widget .reva-markdown ol ul {
+  margin: 2px 0;
+}
+
+/* Inline code */
+.reva-widget .reva-markdown code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+}
+
+/* Code blocks */
+.reva-widget .reva-markdown pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.reva-widget .reva-markdown pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Images (fallback for inline markdown images) */
+.reva-widget .reva-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+  display: block;
+}
+
+/* Horizontal rule */
+.reva-widget .reva-markdown hr {
+  border: none;
+  border-top: 1px solid var(--reva-border);
+  margin: 10px 0;
+}
+
+/* Strikethrough */
+.reva-widget .reva-markdown del,
+.reva-widget .reva-markdown s {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 /* === Citations/Sources === */
 
 .reva-sources {
@@ -394,6 +542,94 @@
   100% {
     opacity: 0;
   }
+}
+
+/* === Product Cards Grid === */
+
+.reva-products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reva-product-card {
+  background: var(--reva-bg);
+  border: 1px solid var(--reva-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reva-product-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.reva-product-card-link:hover {
+  border-color: var(--reva-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.reva-product-card-image {
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.reva-product-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.reva-product-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--reva-text-muted);
+}
+
+.reva-product-card-info {
+  padding: 8px 10px;
+}
+
+.reva-product-card-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--reva-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.reva-product-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.reva-product-card-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--reva-text);
+}
+
+.reva-product-card-badge {
+  font-size: 10px;
+  color: var(--reva-error-text);
+  background: var(--reva-error-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
 /* === Reduced Motion === */

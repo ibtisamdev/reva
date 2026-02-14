@@ -57,6 +57,7 @@ limiter.enabled = False
 
 _test_engine: Any = None
 _test_session_factory: Any = None
+_TEST_DATABASE_URL = str(settings.database_url).replace("/reva", "/reva_test")
 
 # Tables to truncate after each test (reverse dependency order)
 _TABLES_TO_TRUNCATE = [
@@ -73,8 +74,9 @@ _TABLES_TO_TRUNCATE = [
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def _create_tables() -> AsyncGenerator[None, None]:
-    """Create all tables once per test session, drop on teardown.
+    """Create all tables once per test session in the reva_test database.
 
+    Uses a separate reva_test database so tests never touch dev data.
     The engine is created here (not at module level) so that the connection
     pool is bound to the session-scoped event loop.
 
@@ -83,7 +85,7 @@ async def _create_tables() -> AsyncGenerator[None, None]:
     """
     global _test_engine, _test_session_factory  # noqa: PLW0603
     _test_engine = create_async_engine(
-        str(settings.database_url),
+        _TEST_DATABASE_URL,
         echo=False,
         future=True,
         poolclass=NullPool,
@@ -1045,6 +1047,18 @@ def mock_celery_embedding_task() -> Generator[MagicMock, None, None]:
         # Mock the .delay() method
         mock_task.delay = MagicMock()
         yield mock_task
+
+
+@pytest.fixture
+def mock_async_session_maker(_create_tables: None) -> Generator[None, None, None]:
+    """Patch async_session_maker so background tasks use the test database.
+
+    Tasks like _process_article_embeddings_async create their own sessions
+    via async_session_maker, which defaults to the dev database. This
+    redirects them to reva_test.
+    """
+    with patch("app.workers.tasks.embedding.async_session_maker", _test_session_factory):
+        yield
 
 
 @pytest.fixture

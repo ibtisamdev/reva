@@ -8,6 +8,7 @@ import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 # Re-export auth dependencies for convenience
 from app.core.auth import (
@@ -70,9 +71,13 @@ async def get_store_by_id(
     """
     from app.models.store import Store
 
-    query = select(Store).where(
-        Store.id == store_id,
-        Store.is_active == True,  # noqa: E712
+    query = (
+        select(Store)
+        .where(
+            Store.id == store_id,
+            Store.is_active == True,  # noqa: E712
+        )
+        .options(selectinload(Store.integration))
     )
     result = await db.execute(query)
     store = result.scalar_one_or_none()

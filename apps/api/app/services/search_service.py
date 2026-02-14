@@ -30,6 +30,7 @@ class SearchService:
         store_id: UUID,
         filters: ProductFilters | None = None,
         limit: int = 10,
+        min_similarity: float = 0.35,
     ) -> list[ProductSearchResult]:
         """Search products using Reciprocal Rank Fusion of vector + full-text results.
 
@@ -43,7 +44,9 @@ class SearchService:
             List of ProductSearchResult sorted by combined relevance
         """
         # Run both search methods
-        vector_results = await self._vector_search(query, store_id, filters, limit=limit * 2)
+        vector_results = await self._vector_search(
+            query, store_id, filters, limit=limit * 2, min_similarity=min_similarity
+        )
         fulltext_results = await self._fulltext_search(query, store_id, filters, limit=limit * 2)
 
         # Combine via RRF
@@ -57,6 +60,7 @@ class SearchService:
         store_id: UUID,
         filters: ProductFilters | None = None,
         limit: int = 20,
+        min_similarity: float = 0.35,
     ) -> list[ProductSearchResult]:
         """Search products by embedding cosine similarity."""
         try:
@@ -66,6 +70,7 @@ class SearchService:
             return []
 
         distance_expr = Product.embedding.cosine_distance(query_embedding)
+        max_distance = 1 - min_similarity
 
         stmt = (
             select(
@@ -76,6 +81,7 @@ class SearchService:
                 Product.store_id == store_id,
                 Product.status == "active",
                 Product.embedding.isnot(None),
+                distance_expr <= max_distance,
             )
             .order_by(distance_expr)
             .limit(limit)

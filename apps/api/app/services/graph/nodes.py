@@ -74,9 +74,7 @@ async def _run_tool_loop(
     """
     result = ToolLoopResult(content="")
     tool_names = [t.name for t in tools]
-    logger.info(
-        "Tool loop started: force_first=%s, tools=%s", force_first_tool_call, tool_names
-    )
+    logger.info("Tool loop started: force_first=%s, tools=%s", force_first_tool_call, tool_names)
 
     for i in range(max_iterations):
         if force_first_tool_call and i == 0:
@@ -159,7 +157,12 @@ async def classify_intent(state: ConversationState) -> dict[str, Any]:
         intent = "small_talk"
         confidence = 0.3
 
-    logger.info("Intent classified: intent=%s, confidence=%.2f, message=%r", intent, confidence, user_message)
+    logger.info(
+        "Intent classified: intent=%s, confidence=%.2f, message=%r",
+        intent,
+        confidence,
+        user_message,
+    )
     return {"intent": intent, "confidence": confidence}
 
 

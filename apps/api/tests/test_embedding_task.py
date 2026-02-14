@@ -15,6 +15,7 @@ from app.models.store import Store
 from app.workers.tasks.embedding import _process_article_embeddings_async
 
 
+@pytest.mark.usefixtures("mock_async_session_maker")
 class TestProcessArticleEmbeddings:
     """Tests for _process_article_embeddings_async()."""
 

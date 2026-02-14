@@ -112,6 +112,8 @@ def create_product_tools(
                     "description": r.description,
                     "in_stock": r.in_stock,
                     "image_url": r.image_url,
+                    "handle": r.handle,
+                    "score": round(r.score, 4),
                 }
             )
 
@@ -239,6 +241,9 @@ def create_product_tools(
                         "title": r.title,
                         "price": r.price,
                         "description": r.description,
+                        "in_stock": r.in_stock,
+                        "image_url": r.image_url,
+                        "handle": r.handle,
                         "score": r.score,
                     }
                     for r in results
@@ -260,11 +265,25 @@ def create_product_tools(
         return json.dumps(
             {
                 "upsells": [
-                    {"product_id": r.product_id, "title": r.title, "price": r.price}
+                    {
+                        "product_id": r.product_id,
+                        "title": r.title,
+                        "price": r.price,
+                        "in_stock": r.in_stock,
+                        "image_url": r.image_url,
+                        "handle": r.handle,
+                    }
                     for r in upsells
                 ],
                 "cross_sells": [
-                    {"product_id": r.product_id, "title": r.title, "price": r.price}
+                    {
+                        "product_id": r.product_id,
+                        "title": r.title,
+                        "price": r.price,
+                        "in_stock": r.in_stock,
+                        "image_url": r.image_url,
+                        "handle": r.handle,
+                    }
                     for r in cross_sells
                 ],
             }
