@@ -28,16 +28,12 @@ def store_id() -> uuid.UUID:
 class TestCreateOrderTools:
     """Tests for create_order_tools()."""
 
-    def test_returns_three_tools(
-        self, mock_order_service: MagicMock, store_id: uuid.UUID
-    ) -> None:
+    def test_returns_three_tools(self, mock_order_service: MagicMock, store_id: uuid.UUID) -> None:
         """create_order_tools returns exactly 3 tools."""
         tools = create_order_tools(mock_order_service, store_id)
         assert len(tools) == 3
 
-    def test_tool_names(
-        self, mock_order_service: MagicMock, store_id: uuid.UUID
-    ) -> None:
+    def test_tool_names(self, mock_order_service: MagicMock, store_id: uuid.UUID) -> None:
         """Tools have correct names."""
         tools = create_order_tools(mock_order_service, store_id)
         names = {t.name for t in tools}
@@ -154,9 +150,7 @@ class TestLookupOrderStatusTool:
 
         await lookup_tool.ainvoke({"order_number": "#1001"})
 
-        mock_order_service.get_order_status.assert_awaited_once_with(
-            store_id, "#1001"
-        )
+        mock_order_service.get_order_status.assert_awaited_once_with(store_id, "#1001")
 
 
 class TestGetTrackingDetailsTool:

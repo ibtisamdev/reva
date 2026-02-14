@@ -443,9 +443,10 @@ class TestChatServiceOrderToolIntegration:
         service = ChatService(db_session)
         request = ChatRequest(message="Where is my order #1001?")
 
-        with patch("app.services.order_service.OrderService") as mock_os_cls, patch(
-            "app.services.order_tools.create_order_tools"
-        ) as mock_cot:
+        with (
+            patch("app.services.order_service.OrderService") as mock_os_cls,
+            patch("app.services.order_tools.create_order_tools") as mock_cot,
+        ):
             mock_cot.return_value = [MagicMock(name="tool1")]
 
             await service.process_message(store, request, redis_client=fake_redis)
@@ -621,7 +622,9 @@ class TestChatServiceMaybeRecordOrderInquiry:
 
         count = (
             await db_session.execute(
-                select(func.count()).select_from(OrderInquiry).where(OrderInquiry.store_id == store.id)
+                select(func.count())
+                .select_from(OrderInquiry)
+                .where(OrderInquiry.store_id == store.id)
             )
         ).scalar()
         assert count == 0

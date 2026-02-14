@@ -45,9 +45,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_fulfillments.return_value = sample_fulfillments
 
             service = OrderService(db_session, fake_redis)
-            result = await service.verify_and_lookup(
-                store.id, "#1001", "customer@example.com"
-            )
+            result = await service.verify_and_lookup(store.id, "#1001", "customer@example.com")
 
         assert result.verified is True
         assert result.order is not None
@@ -77,9 +75,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_by_number.return_value = sample_shopify_order
 
             service = OrderService(db_session, fake_redis)
-            result = await service.verify_and_lookup(
-                store.id, "#1001", "wrong@example.com"
-            )
+            result = await service.verify_and_lookup(store.id, "#1001", "wrong@example.com")
 
         assert result.verified is False
         assert result.order is None
@@ -106,9 +102,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_by_number.return_value = None
 
             service = OrderService(db_session, fake_redis)
-            result = await service.verify_and_lookup(
-                store.id, "#9999", "customer@example.com"
-            )
+            result = await service.verify_and_lookup(store.id, "#9999", "customer@example.com")
 
         assert result.verified is False
         assert "not found" in result.message.lower()
@@ -122,9 +116,7 @@ class TestOrderServiceVerifyAndLookup:
     ) -> None:
         """Store without Shopify integration returns unavailable message."""
         service = OrderService(db_session, fake_redis)
-        result = await service.verify_and_lookup(
-            store.id, "#1001", "customer@example.com"
-        )
+        result = await service.verify_and_lookup(store.id, "#1001", "customer@example.com")
 
         assert result.verified is False
         assert "not available" in result.message.lower()
@@ -156,9 +148,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_fulfillments.return_value = sample_fulfillments
 
             service = OrderService(db_session, fake_redis)
-            result = await service.verify_and_lookup(
-                store.id, "#1001", "customer@example.com"
-            )
+            result = await service.verify_and_lookup(store.id, "#1001", "customer@example.com")
 
         # Should NOT have called get_order_by_number (cache hit)
         mock_client.get_order_by_number.assert_not_called()
@@ -188,9 +178,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_fulfillments.return_value = sample_fulfillments
 
             service = OrderService(db_session, fake_redis)
-            await service.verify_and_lookup(
-                store.id, "#1001", "customer@example.com"
-            )
+            await service.verify_and_lookup(store.id, "#1001", "customer@example.com")
 
         # Verify Redis cache was set
         cache_key = f"order:{store.id}:1001"
@@ -223,9 +211,7 @@ class TestOrderServiceVerifyAndLookup:
             mock_client.get_order_fulfillments.return_value = sample_fulfillments
 
             service = OrderService(db_session, fake_redis)
-            result = await service.verify_and_lookup(
-                store.id, "#1001", "CUSTOMER@EXAMPLE.COM"
-            )
+            result = await service.verify_and_lookup(store.id, "#1001", "CUSTOMER@EXAMPLE.COM")
 
         assert result.verified is True
 
@@ -257,9 +243,7 @@ class TestOrderServiceVerifyAndLookup:
 
             service = OrderService(db_session, fake_redis)
             # Use '#1001' — should still hit cache for '1001'
-            result = await service.verify_and_lookup(
-                store.id, "#1001", "customer@example.com"
-            )
+            result = await service.verify_and_lookup(store.id, "#1001", "customer@example.com")
 
         mock_client.get_order_by_number.assert_not_called()
         assert result.verified is True
@@ -638,24 +622,43 @@ class TestOrderServiceBuildOrderStatus:
 class TestOrderServiceGetStatusMessage:
     """Tests for OrderService._get_status_message()."""
 
-    def _get_msg(self, order_data: dict[str, Any], fulfillments: list[dict[str, Any]] | None = None) -> str:
+    def _get_msg(
+        self, order_data: dict[str, Any], fulfillments: list[dict[str, Any]] | None = None
+    ) -> str:
         service = OrderService(MagicMock(), MagicMock())
         return service._get_status_message(order_data, fulfillments or [])
 
     def test_cancelled_order(self) -> None:
-        assert "cancelled" in self._get_msg(
-            {"financial_status": "paid", "fulfillment_status": None, "cancelled_at": "2024-01-01"}
-        ).lower()
+        assert (
+            "cancelled"
+            in self._get_msg(
+                {
+                    "financial_status": "paid",
+                    "fulfillment_status": None,
+                    "cancelled_at": "2024-01-01",
+                }
+            ).lower()
+        )
 
     def test_refunded_order(self) -> None:
-        assert "fully refunded" in self._get_msg(
-            {"financial_status": "refunded", "fulfillment_status": None, "cancelled_at": None}
-        ).lower()
+        assert (
+            "fully refunded"
+            in self._get_msg(
+                {"financial_status": "refunded", "fulfillment_status": None, "cancelled_at": None}
+            ).lower()
+        )
 
     def test_partially_refunded_order(self) -> None:
-        assert "partially refunded" in self._get_msg(
-            {"financial_status": "partially_refunded", "fulfillment_status": None, "cancelled_at": None}
-        ).lower()
+        assert (
+            "partially refunded"
+            in self._get_msg(
+                {
+                    "financial_status": "partially_refunded",
+                    "fulfillment_status": None,
+                    "cancelled_at": None,
+                }
+            ).lower()
+        )
 
     def test_paid_unfulfilled(self) -> None:
         msg = self._get_msg(

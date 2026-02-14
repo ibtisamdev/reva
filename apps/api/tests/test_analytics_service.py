@@ -28,7 +28,9 @@ class TestGetSummary:
         """Returns correct summary statistics when inquiries exist."""
         # 3 inquiries: 2 resolved, 1 unresolved
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.ANSWERED)
-        await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.TRACKING_PROVIDED)
+        await order_inquiry_factory(
+            store_id=store.id, resolution=InquiryResolution.TRACKING_PROVIDED
+        )
         await order_inquiry_factory(store_id=store.id, resolution=None)
 
         service = WismoAnalyticsService(db_session)
@@ -118,8 +120,12 @@ class TestGetSummary:
     ) -> None:
         """Only ANSWERED and TRACKING_PROVIDED count as resolved."""
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.ANSWERED)
-        await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.TRACKING_PROVIDED)
-        await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.VERIFICATION_FAILED)
+        await order_inquiry_factory(
+            store_id=store.id, resolution=InquiryResolution.TRACKING_PROVIDED
+        )
+        await order_inquiry_factory(
+            store_id=store.id, resolution=InquiryResolution.VERIFICATION_FAILED
+        )
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.ESCALATED)
         await order_inquiry_factory(store_id=store.id, resolution=InquiryResolution.UNRESOLVED)
 

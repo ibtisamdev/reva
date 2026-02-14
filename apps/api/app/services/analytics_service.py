@@ -29,7 +29,12 @@ class WismoAnalyticsService:
             func.count().label("total"),
             func.count(
                 case(
-                    (OrderInquiry.resolution.in_([InquiryResolution.ANSWERED, InquiryResolution.TRACKING_PROVIDED]), 1),
+                    (
+                        OrderInquiry.resolution.in_(
+                            [InquiryResolution.ANSWERED, InquiryResolution.TRACKING_PROVIDED]
+                        ),
+                        1,
+                    ),
                     else_=None,
                 )
             ).label("resolved"),

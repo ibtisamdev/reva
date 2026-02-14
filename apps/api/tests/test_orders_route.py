@@ -50,9 +50,7 @@ class TestVerifyOrderEndpoint:
             message="Order verified successfully.",
         )
 
-        with patch(
-            "app.api.v1.orders.OrderService"
-        ) as mock_service_cls:
+        with patch("app.api.v1.orders.OrderService") as mock_service_cls:
             mock_service = AsyncMock()
             mock_service_cls.return_value = mock_service
             mock_service.verify_and_lookup.return_value = mock_verification
@@ -80,9 +78,7 @@ class TestVerifyOrderEndpoint:
             message="The email address does not match our records for this order.",
         )
 
-        with patch(
-            "app.api.v1.orders.OrderService"
-        ) as mock_service_cls:
+        with patch("app.api.v1.orders.OrderService") as mock_service_cls:
             mock_service = AsyncMock()
             mock_service_cls.return_value = mock_service
             mock_service.verify_and_lookup.return_value = mock_verification
@@ -110,9 +106,7 @@ class TestVerifyOrderEndpoint:
             message="Order not found. Please check the order number and try again.",
         )
 
-        with patch(
-            "app.api.v1.orders.OrderService"
-        ) as mock_service_cls:
+        with patch("app.api.v1.orders.OrderService") as mock_service_cls:
             mock_service = AsyncMock()
             mock_service_cls.return_value = mock_service
             mock_service.verify_and_lookup.return_value = mock_verification
@@ -167,9 +161,7 @@ class TestVerifyOrderEndpoint:
             message="Order lookup is not available for this store.",
         )
 
-        with patch(
-            "app.api.v1.orders.OrderService"
-        ) as mock_service_cls:
+        with patch("app.api.v1.orders.OrderService") as mock_service_cls:
             mock_service = AsyncMock()
             mock_service_cls.return_value = mock_service
             mock_service.verify_and_lookup.return_value = mock_verification

@@ -115,7 +115,7 @@ async def _get_authenticated_store(
 )
 @limiter.limit("10/minute")
 async def send_message(
-    request: Request,
+    request: Request,  # noqa: ARG001 — required by slowapi
     body: ChatRequest,
     db: DBSession,
     store: Store = Depends(get_store_by_id),
