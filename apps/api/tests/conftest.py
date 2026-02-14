@@ -57,7 +57,8 @@ limiter.enabled = False
 
 _test_engine: Any = None
 _test_session_factory: Any = None
-_TEST_DATABASE_URL = str(settings.database_url).replace("/reva", "/reva_test")
+_base_url = str(settings.database_url)
+_TEST_DATABASE_URL = _base_url if _base_url.endswith("/reva_test") else _base_url.replace("/reva", "/reva_test")
 
 # Tables to truncate after each test (reverse dependency order)
 _TABLES_TO_TRUNCATE = [
