@@ -57,6 +57,10 @@ limiter.enabled = False
 
 _test_engine: Any = None
 _test_session_factory: Any = None
+_base_url = str(settings.database_url)
+_TEST_DATABASE_URL = (
+    _base_url if _base_url.endswith("/reva_test") else _base_url.replace("/reva", "/reva_test")
+)
 
 # Tables to truncate after each test (reverse dependency order)
 _TABLES_TO_TRUNCATE = [
@@ -73,8 +77,9 @@ _TABLES_TO_TRUNCATE = [
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def _create_tables() -> AsyncGenerator[None, None]:
-    """Create all tables once per test session, drop on teardown.
+    """Create all tables once per test session in the reva_test database.
 
+    Uses a separate reva_test database so tests never touch dev data.
     The engine is created here (not at module level) so that the connection
     pool is bound to the session-scoped event loop.
 
@@ -83,7 +88,7 @@ async def _create_tables() -> AsyncGenerator[None, None]:
     """
     global _test_engine, _test_session_factory  # noqa: PLW0603
     _test_engine = create_async_engine(
-        str(settings.database_url),
+        _TEST_DATABASE_URL,
         echo=False,
         future=True,
         poolclass=NullPool,
@@ -95,8 +100,8 @@ async def _create_tables() -> AsyncGenerator[None, None]:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with _test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    # Don't drop tables — they're shared with the dev database.
+    # Per-test cleanup is handled by _cleanup_tables (TRUNCATE).
     await _test_engine.dispose()
 
 
@@ -541,7 +546,11 @@ def mock_openai_response() -> dict[str, Any]:
 def mock_openai_chat(
     mock_openai_response: dict[str, Any],
 ) -> Generator[MagicMock, None, None]:
-    """Patch ChatOpenAI in chat_service to return mock LangChain AIMessage responses.
+    """Patch ChatOpenAI in graph nodes to return mock LangChain AIMessage responses.
+
+    The LangGraph workflow makes 2 LLM calls:
+    1. classify_intent (returns non-JSON → falls back to small_talk/low confidence → clarify)
+    2. The routed node (returns the mock response content)
 
     Usage:
         def test_something(mock_openai_chat):
@@ -559,7 +568,7 @@ def mock_openai_chat(
         },
     )
 
-    with patch("app.services.chat_service.ChatOpenAI") as mock_class:
+    with patch("app.services.graph.nodes.ChatOpenAI") as mock_class:
         mock_llm = MagicMock()
         mock_class.return_value = mock_llm
 
@@ -577,16 +586,23 @@ def mock_embedding_service(
 ) -> Generator[MagicMock, None, None]:
     """Patch the embedding service singleton to return mock embeddings.
 
-    This patches get_embedding_service() in retrieval_service.py so that
-    vector similarity searches work with controlled embeddings.
+    This patches get_embedding_service() in retrieval_service.py and
+    search_service.py so that vector similarity searches work with
+    controlled embeddings.
     """
-    with patch("app.services.retrieval_service.get_embedding_service") as mock_get:
+    with (
+        patch("app.services.retrieval_service.get_embedding_service") as mock_get,
+        patch("app.services.search_service.get_embedding_service") as mock_get_search,
+        patch("app.services.recommendation_service.get_embedding_service") as mock_get_recommend,
+    ):
         mock_service = MagicMock()
         mock_service.generate_embedding = AsyncMock(return_value=mock_embedding)
         mock_service.generate_embeddings_batch = AsyncMock(
             side_effect=lambda texts: [mock_embedding for _ in texts]
         )
         mock_get.return_value = mock_service
+        mock_get_search.return_value = mock_service
+        mock_get_recommend.return_value = mock_service
         yield mock_service
 
 
@@ -1034,6 +1050,18 @@ def mock_celery_embedding_task() -> Generator[MagicMock, None, None]:
         # Mock the .delay() method
         mock_task.delay = MagicMock()
         yield mock_task
+
+
+@pytest.fixture
+def mock_async_session_maker(_create_tables: None) -> Generator[None, None, None]:
+    """Patch async_session_maker so background tasks use the test database.
+
+    Tasks like _process_article_embeddings_async create their own sessions
+    via async_session_maker, which defaults to the dev database. This
+    redirects them to reva_test.
+    """
+    with patch("app.workers.tasks.embedding.async_session_maker", _test_session_factory):
+        yield
 
 
 @pytest.fixture

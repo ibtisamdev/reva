@@ -73,6 +73,7 @@ export function ChatWindow({
             role: m.role as 'user' | 'assistant',
             content: m.content,
             sources: m.sources ?? undefined,
+            products: m.products ?? undefined,
           }));
 
         if (restored.length > 0) {
@@ -143,6 +144,7 @@ export function ChatWindow({
       role: 'assistant',
       content: result.response,
       sources: result.sources,
+      products: result.products.length > 0 ? result.products : undefined,
     };
 
     setMessages((prev) => [...prev, assistantMessage]);

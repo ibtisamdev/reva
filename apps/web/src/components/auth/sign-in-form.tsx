@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { signIn } from '@/lib/auth-client';
+import { organization, signIn } from '@/lib/auth-client';
 
 export function SignInForm() {
   const router = useRouter();
@@ -40,6 +40,12 @@ export function SignInForm() {
       if (result.error) {
         setError(result.error.message || 'Failed to sign in');
         return;
+      }
+
+      // Set the user's organization as active so the JWT includes activeOrganizationId
+      const orgs = await organization.list();
+      if (orgs.data && orgs.data.length > 0) {
+        await organization.setActive({ organizationId: orgs.data[0].id });
       }
 
       router.push('/dashboard');

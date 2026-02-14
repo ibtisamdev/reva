@@ -1,8 +1,8 @@
 # Phase 1: Product Search & Discovery
 
-> **Parent:** [M3 Sales & Recommendation Agent](../m3-sales-agent.md)  
-> **Duration:** 1 week  
-> **Status:** Not Started  
+> **Parent:** [M3 Sales & Recommendation Agent](../m3-sales-agent.md)
+> **Duration:** 1 week
+> **Status:** Partially Complete
 > **Dependencies:** M1 (RAG pipeline), M2 (Shopify integration)
 
 ---
@@ -17,101 +17,67 @@ Build a natural language product search system that can understand customer inte
 
 ### 1.1 Product Embedding Generation
 
-**Location:** `apps/api/app/services/product_embeddings.py`
+**Location:** `apps/api/app/models/product.py` (embedding column), `apps/api/app/services/embedding_service.py` (generation)
+**Status:** COMPLETED
 
-- [ ] Generate embeddings for product titles, descriptions, and tags
-- [ ] Create composite embeddings combining multiple product fields
-- [ ] Store embeddings in `product_embeddings` table with pgvector
-- [ ] Implement batch processing for large product catalogs
-- [ ] Handle product updates and re-embedding
+- [x] Generate embeddings for product titles, descriptions, and tags
+- [x] Create composite embeddings combining multiple product fields
+- [x] Store embeddings with pgvector (1536-dim on Product model directly)
+- [x] Batch processing via Shopify sync pipeline
+- [x] Handle product updates and re-embedding via Shopify webhooks
 
-**Database Schema:**
-
-```sql
-CREATE TABLE product_embeddings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-    embedding vector(1536) NOT NULL,
-    content_hash VARCHAR(64) NOT NULL, -- For detecting changes
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_product_embeddings_vector ON product_embeddings
-USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-
-CREATE INDEX idx_product_embeddings_store ON product_embeddings(store_id);
-```
+> **Implementation Note:** Embeddings live directly on the `Product.embedding` column (1536-dim pgvector) rather than a separate `product_embeddings` table. This simplifies queries by avoiding joins and keeps the search service a single-table operation. The existing `EmbeddingService` (OpenAI text-embedding-3-small) generates embeddings during Shopify product sync.
 
 ### 1.2 Hybrid Search Engine
 
-**Location:** `apps/api/app/services/product_search.py`
+**Location:** `apps/api/app/services/search_service.py`
+**Status:** COMPLETED
 
-- [ ] Implement semantic search using product embeddings
-- [ ] Add keyword search using PostgreSQL full-text search
-- [ ] Combine semantic and keyword scores with weighted ranking
-- [ ] Support search filters (price range, category, availability)
-- [ ] Implement search result ranking algorithm
+- [x] Implement semantic search using product embeddings (cosine distance via pgvector)
+- [x] Add keyword search using PostgreSQL full-text search (tsvector + ts_rank)
+- [x] Combine results with Reciprocal Rank Fusion (RRF, K=60)
+- [x] Support search filters (price range, category, tags, vendor, availability)
+- [x] Implement search result ranking algorithm
 
-**Search Function:**
+**Key Methods:**
 
 ```python
-async def search_products(
-    query: str,
-    store_id: UUID,
-    filters: ProductFilters | None = None,
-    limit: int = 10,
-    semantic_weight: float = 0.7,
-    keyword_weight: float = 0.3
-) -> list[ProductSearchResult]:
-    """
-    Hybrid product search combining semantic and keyword matching.
-
-    Args:
-        query: Natural language search query
-        store_id: Store to search within
-        filters: Price, category, availability filters
-        limit: Maximum results to return
-        semantic_weight: Weight for semantic similarity (0-1)
-        keyword_weight: Weight for keyword matching (0-1)
-
-    Returns:
-        List of products with relevance scores
-    """
+class SearchService:
+    async def hybrid_search(query, store_id, filters, limit) -> list[ProductSearchResult]
+    async def _vector_search(query_embedding, store_id, limit) -> list[Product]
+    async def _fulltext_search(query, store_id, limit) -> list[Product]
+    def _apply_filters(query, filters) -> Query
+    def _reciprocal_rank_fusion(vector_results, text_results, k=60) -> list[Product]
+    async def get_product_by_id(product_id, store_id) -> Product | None
 ```
+
+> **Implementation Note:** Uses Reciprocal Rank Fusion (RRF with K=60) instead of weighted scoring (the original plan used `semantic_weight=0.7, keyword_weight=0.3`). Both vector and full-text results are fetched at 2x limit, then combined via RRF. This is a standard ranking technique from information retrieval literature.
 
 ### 1.3 Search Intent Classification
 
-**Location:** `apps/api/app/services/search_intent.py`
+**Location:** `apps/api/app/services/graph/nodes.py` (`classify_intent` function)
+**Status:** COMPLETED (moved to Phase 3)
 
-- [ ] Classify search queries into categories (gift, specific item, browse)
-- [ ] Extract key attributes (color, size, price range, occasion)
-- [ ] Identify product categories from natural language
-- [ ] Handle ambiguous queries with clarifying questions
+- [x] Classify search queries into categories
+- [x] Extract key attributes from natural language
+- [x] Handle ambiguous queries with clarifying questions
 
-**Intent Categories:**
-
-```python
-class SearchIntent(str, Enum):
-    SPECIFIC_PRODUCT = "specific_product"  # "red Nike shoes size 10"
-    GIFT_SEARCH = "gift_search"           # "gift for my mom"
-    BROWSE_CATEGORY = "browse_category"   # "summer dresses"
-    PROBLEM_SOLVING = "problem_solving"   # "something for back pain"
-    PRICE_COMPARISON = "price_comparison" # "cheap wireless headphones"
-```
+> **Implementation Note:** Intent classification was implemented in Phase 3 as part of the LangGraph workflow, not as a standalone `search_intent.py`. It uses GPT-4o with temp=0 and classifies into 6 intents (product_search, product_recommendation, order_status, faq_support, small_talk, complaint). See [Phase 3](phase-3-langgraph-router.md#32-intent-classification-node) for details.
 
 ### 1.4 Product Filtering & Ranking
 
-**Location:** `apps/api/app/services/product_filters.py`
+**Location:** `apps/api/app/services/search_service.py` (`_apply_filters` method), `apps/api/app/schemas/search.py` (`ProductFilters` model)
+**Status:** COMPLETED
 
-- [ ] Implement inventory-aware filtering (in-stock only)
-- [ ] Price range filtering with dynamic suggestions
-- [ ] Category and tag-based filtering
-- [ ] Popularity-based ranking boost
-- [ ] Personalization based on store preferences
+- [x] Inventory-aware filtering (`in_stock_only`) — EXISTS query on variants JSONB
+- [x] Price range filtering — via first variant price from JSONB
+- [x] Category filtering — `product_type` column
+- [x] Tag-based filtering — PostgreSQL array overlap
+- [x] Vendor filtering (added beyond original plan)
+- [ ] ~~Popularity-based ranking boost~~ — not implemented (no popularity data)
+- [ ] ~~Personalization based on store preferences~~ — DEFERRED
 
-**Filter Implementation:**
+**ProductFilters Schema:**
 
 ```python
 class ProductFilters(BaseModel):
@@ -119,185 +85,96 @@ class ProductFilters(BaseModel):
     price_max: float | None = None
     categories: list[str] | None = None
     tags: list[str] | None = None
-    in_stock_only: bool = True
-    min_rating: float | None = None
-
-class ProductSearchResult(BaseModel):
-    product: Product
-    relevance_score: float
-    match_reasons: list[str]  # Why this product matched
-    in_stock: bool
-    inventory_count: int | None
+    vendors: list[str] | None = None  # Added beyond original plan
+    in_stock_only: bool = False
 ```
 
 ### 1.5 Search API Endpoints
 
-**Location:** `apps/api/app/api/v1/products.py`
+**Location:** `apps/api/app/api/v1/search.py`
+**Status:** PARTIALLY COMPLETE
 
-- [ ] `POST /api/v1/products/search` - Natural language product search
-- [ ] `GET /api/v1/products/suggestions` - Search suggestions/autocomplete
-- [ ] `GET /api/v1/products/filters` - Available filter options for store
-- [ ] `POST /api/v1/products/embeddings/refresh` - Regenerate embeddings
+- [x] `POST /api/v1/products/search` — Natural language product search
+- [ ] `GET /api/v1/products/suggestions` — Search suggestions/autocomplete (not built)
+- [ ] `GET /api/v1/products/filters` — Available filter options for store (not built)
+- [ ] `POST /api/v1/products/embeddings/refresh` — Regenerate embeddings (not built)
 
-**Search Endpoint:**
-
-```python
-@router.post("/search", response_model=ProductSearchResponse)
-async def search_products(
-    request: ProductSearchRequest,
-    store: Store = Depends(get_current_store),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Search products using natural language query.
-
-    Example request:
-    {
-        "query": "comfortable running shoes for women under $100",
-        "filters": {
-            "price_max": 100,
-            "in_stock_only": true
-        },
-        "limit": 10
-    }
-    """
-```
+> **Implementation Note:** Only the core search endpoint was built. It's registered under the `/products` prefix via `router.py`. Request/response schemas are in `app/schemas/search.py` (SearchRequest, SearchResponse, ProductSearchResult).
 
 ### 1.6 Search Analytics & Optimization
 
-**Location:** `apps/api/app/services/search_analytics.py`
+**Location:** Not built
+**Status:** DEFERRED → [deferred-features.md](../deferred-features.md#search-analytics--optimization-originally-phase-1-task-16)
 
-- [ ] Track search queries and results clicked
-- [ ] Identify zero-result searches for improvement
-- [ ] A/B test different ranking algorithms
-- [ ] Monitor search performance metrics
-- [ ] Generate search insights for merchants
-
-**Analytics Schema:**
-
-```sql
-CREATE TABLE search_analytics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    store_id UUID NOT NULL REFERENCES stores(id),
-    query TEXT NOT NULL,
-    results_count INTEGER NOT NULL,
-    clicked_product_id UUID REFERENCES products(id),
-    click_position INTEGER, -- Position of clicked result
-    session_id VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+- [ ] ~~Track search queries and results clicked~~
+- [ ] ~~Identify zero-result searches for improvement~~
+- [ ] ~~A/B test different ranking algorithms~~
+- [ ] ~~Monitor search performance metrics~~
+- [ ] ~~Generate search insights for merchants~~
 
 ### 1.7 Inventory Integration
 
-**Location:** `apps/api/app/services/inventory.py`
+**Location:** `apps/api/app/services/search_service.py` (`_apply_filters` with `in_stock_only`), `apps/api/app/models/product.py` (`variants` JSONB column)
+**Status:** COMPLETED (via Shopify sync)
 
-- [ ] Real-time inventory checking via Shopify API
-- [ ] Cache inventory data with TTL for performance
-- [ ] Handle inventory webhooks for immediate updates
-- [ ] Implement low-stock warnings in search results
-- [ ] Support variant-level inventory tracking
+- [x] Inventory data from Shopify synced to `Product.variants` JSONB
+- [x] Variant-level inventory tracking (per-variant `inventory_quantity` in JSONB)
+- [x] Filter by stock availability in search
+- [ ] ~~Real-time Shopify API calls during search~~ — not needed; data synced via webhooks
+- [ ] ~~Cache inventory with TTL~~ — not needed; webhook-driven sync
+- [ ] ~~Low-stock warnings in search results~~ — not implemented
 
-**Inventory Service:**
-
-```python
-class InventoryService:
-    async def check_availability(
-        self,
-        product_ids: list[UUID],
-        store_id: UUID
-    ) -> dict[UUID, InventoryStatus]:
-        """Check real-time inventory for multiple products."""
-
-    async def get_stock_level(
-        self,
-        product_id: UUID,
-        variant_id: UUID | None = None
-    ) -> int:
-        """Get current stock level for product/variant."""
-```
+> **Implementation Note:** Inventory data comes from Shopify product sync and lives in `Product.variants` JSONB column. Each variant object contains `inventory_quantity`. The search service's `_apply_filters` method checks inventory via an EXISTS subquery on the JSONB array. No separate `InventoryService` was needed.
 
 ---
 
-## Files to Create/Modify
+## Files Created/Modified
 
-| File                                   | Action | Purpose                        |
-| -------------------------------------- | ------ | ------------------------------ |
-| `app/services/product_embeddings.py`   | Create | Product embedding generation   |
-| `app/services/product_search.py`       | Create | Hybrid search engine           |
-| `app/services/search_intent.py`        | Create | Query intent classification    |
-| `app/services/product_filters.py`      | Create | Search filtering and ranking   |
-| `app/services/search_analytics.py`     | Create | Search performance tracking    |
-| `app/services/inventory.py`            | Create | Real-time inventory checking   |
-| `app/api/v1/products.py`               | Modify | Add search endpoints           |
-| `app/schemas/product_search.py`        | Create | Search request/response models |
-| `app/models/product_embeddings.py`     | Create | Database model for embeddings  |
-| `app/workers/embedding_tasks.py`       | Create | Async embedding generation     |
-| `migrations/add_product_embeddings.py` | Create | Database migration             |
+| File                         | Action   | Purpose                                        |
+| ---------------------------- | -------- | ---------------------------------------------- |
+| `app/services/search_service.py` | Created  | Hybrid search engine (vector + full-text + RRF) |
+| `app/schemas/search.py`         | Created  | ProductFilters, SearchRequest, SearchResponse   |
+| `app/api/v1/search.py`          | Created  | POST /products/search endpoint                  |
+| `app/api/v1/router.py`          | Modified | Registered search router under /products prefix |
 
 ---
 
 ## Dependencies
 
-```toml
-# Add to pyproject.toml
-scikit-learn = "^1.3"     # For search ranking algorithms
-numpy = "^1.24"           # Numerical operations
-sentence-transformers = "^2.2"  # Alternative embedding models
-```
+No new dependencies needed. The search service uses existing packages already in `pyproject.toml`:
+
+- `pgvector` — vector similarity operations
+- `langchain-openai` — embedding generation (via existing EmbeddingService)
+- `sqlalchemy` — full-text search queries
 
 ---
 
 ## Testing
 
-- [ ] Unit test: product embedding generation accuracy
-- [ ] Unit test: semantic search returns relevant results
-- [ ] Unit test: keyword search handles typos and variations
-- [ ] Unit test: hybrid scoring combines results correctly
-- [ ] Unit test: filters work correctly (price, category, stock)
+- [x] Unit test: hybrid search combines vector + fulltext results (`tests/test_search_service.py::TestHybridSearch`)
+- [x] Unit test: filters work correctly — price, category, stock, vendor, tags (`tests/test_search_service.py::TestApplyFilters`)
+- [x] Unit test: RRF score computation (`tests/test_search_service.py::TestRRF`)
+- [x] Unit test: product-to-search-result conversion (`tests/test_search_service.py::TestProductToSearchResult`)
 - [ ] Integration test: full search flow with real product data
 - [ ] Performance test: search response time under load
-- [ ] A/B test: different ranking algorithms
+- [ ] ~~A/B test: different ranking algorithms~~ — DEFERRED
 
 ---
 
 ## Acceptance Criteria
 
-1. **Natural Language Understanding**: Can interpret queries like "gift for my mom who likes gardening"
-2. **Semantic Search**: Finds relevant products even without exact keyword matches
-3. **Hybrid Ranking**: Combines semantic and keyword relevance effectively
-4. **Real-time Inventory**: Only shows in-stock products when requested
-5. **Performance**: Search results returned within 2 seconds
-6. **Filtering**: Supports price, category, and availability filters
-7. **Analytics**: Tracks search performance and zero-result queries
-
----
-
-## Example Queries & Expected Results
-
-**Query:** "comfortable running shoes for women under $100"
-
-- **Intent:** Specific product search
-- **Filters:** Category=shoes, gender=women, price<$100
-- **Results:** Running shoes sorted by comfort rating and price
-
-**Query:** "gift for my teenage daughter"
-
-- **Intent:** Gift search
-- **Clarification:** "What are her interests? Here are some popular items for teens..."
-- **Results:** Trending products in teen categories
-
-**Query:** "something warm for winter"
-
-- **Intent:** Browse category
-- **Filters:** Season=winter, category=clothing
-- **Results:** Jackets, sweaters, winter accessories
+1. **Semantic Search**: Finds relevant products even without exact keyword matches — DONE (via pgvector cosine distance)
+2. **Hybrid Ranking**: Combines semantic and keyword relevance effectively — DONE (RRF with K=60)
+3. **Real-time Inventory**: Only shows in-stock products when requested — DONE (via synced variant data)
+4. **Filtering**: Supports price, category, tags, vendor, and availability filters — DONE
+5. **Performance**: Search results returned within 2 seconds — not formally benchmarked
+6. **Analytics**: ~~Tracks search performance~~ — DEFERRED
 
 ---
 
 ## Notes
 
-- Start with simple keyword + semantic search, optimize ranking iteratively
-- Consider using Shopify's search API as fallback for complex queries
-- Implement search suggestions to guide users toward better queries
-- Monitor search analytics to identify improvement opportunities
+- Hybrid search uses RRF (Reciprocal Rank Fusion) which is superior to simple weighted scoring for combining ranked lists
+- Product embeddings live on the Product model itself, avoiding an extra join table
+- The search service is multi-tenant safe — all queries scoped by store_id
+- Search suggestions and filter options endpoints can be added later without changing the core search logic

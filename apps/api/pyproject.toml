@@ -24,9 +24,9 @@ dependencies = [
     "openai>=1.59.0",
     "tiktoken>=0.8.0",
     "pypdf>=5.0.0",
-    # LangChain (M2: Order Status Agent)
     "langchain-core>=0.3.0",
     "langchain-openai>=0.3.0",
+    "langgraph>=0.2.0",
     # Production hardening
     "slowapi>=0.1.9",
     "sentry-sdk[fastapi]>=2.0.0",
@@ -104,6 +104,7 @@ module = [
     "langchain.*",
     "langchain_core.*",
     "langchain_openai.*",
+    "langgraph.*",
 ]
 ignore_missing_imports = true
 

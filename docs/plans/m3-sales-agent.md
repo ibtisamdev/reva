@@ -1,7 +1,7 @@
 # Milestone 3: Sales & Recommendation Agent - Implementation Plan
 
-> **Status:** Not Started  
-> **Timeline:** 3 weeks  
+> **Status:** In Progress
+> **Timeline:** 3 weeks
 > **Goal:** Transform from support-only to sales assistant that helps customers find and buy products.
 
 ---
@@ -12,26 +12,26 @@ Milestone 3 evolves Reva from a Q&A bot into an intelligent sales agent that can
 
 ### Success Criteria
 
-- [ ] Natural language product search ("I need a gift for my mom who likes gardening")
-- [ ] Smart product recommendations based on customer preferences
-- [ ] Product comparison with side-by-side feature analysis
-- [ ] Size and fit guidance using size charts and customer reviews
-- [ ] Upsell and cross-sell suggestions for relevant add-ons
-- [ ] Inventory-aware responses (only recommend in-stock items)
-- [ ] Add-to-cart deep links for seamless purchase flow
-- [ ] LangGraph state machine for conversation routing
-- [ ] Sales analytics dashboard for merchants
+- [x] Natural language product search ("I need a gift for my mom who likes gardening")
+- [x] Smart product recommendations based on customer preferences
+- [x] Product comparison with side-by-side feature analysis
+- [ ] ~~Size and fit guidance using size charts and customer reviews~~ — DEFERRED (see [deferred-features.md](deferred-features.md#size--fit-guidance-originally-phase-2-task-23))
+- [x] Upsell and cross-sell suggestions for relevant add-ons
+- [x] Inventory-aware responses (only recommend in-stock items)
+- [ ] ~~Add-to-cart deep links for seamless purchase flow~~ — DEFERRED (see [deferred-features.md](deferred-features.md#add-to-cart-deep-links-originally-m3-roadmap))
+- [x] LangGraph state machine for conversation routing
+- [ ] ~~Sales analytics dashboard for merchants~~ — DEFERRED (see [deferred-features.md](deferred-features.md#sales-analytics-dashboard-originally-m3-success-criteria))
 
 ### Success Metrics
 
-| Metric                      | Target      |
-| --------------------------- | ----------- |
-| Product search accuracy     | > 85%       |
-| Recommendation relevance    | > 80%       |
-| Add-to-cart conversion rate | > 15%       |
-| Size guidance accuracy      | > 90%       |
-| Response time (with search) | < 5 seconds |
-| Inventory sync accuracy     | > 99%       |
+| Metric                      | Target      | Status  |
+| --------------------------- | ----------- | ------- |
+| Product search accuracy     | > 85%       | Active  |
+| Recommendation relevance    | > 80%       | Active  |
+| Response time (with search) | < 5 seconds | Active  |
+| Inventory sync accuracy     | > 99%       | Active  |
+| Add-to-cart conversion rate | > 15%       | DEFERRED |
+| Size guidance accuracy      | > 90%       | DEFERRED |
 
 ---
 
@@ -39,11 +39,11 @@ Milestone 3 evolves Reva from a Q&A bot into an intelligent sales agent that can
 
 M3 is broken into 3 sequential phases:
 
-| Phase                                            | Focus                            | Duration | Status      |
-| ------------------------------------------------ | -------------------------------- | -------- | ----------- |
-| [Phase 1](m3-phases/phase-1-product-search.md)   | Product Search & Discovery       | 1 week   | Not Started |
-| [Phase 2](m3-phases/phase-2-recommendations.md)  | Recommendations Engine           | 1 week   | Not Started |
-| [Phase 3](m3-phases/phase-3-langgraph-router.md) | LangGraph Router & State Machine | 1 week   | Not Started |
+| Phase                                            | Focus                            | Duration | Status             |
+| ------------------------------------------------ | -------------------------------- | -------- | ------------------ |
+| [Phase 1](m3-phases/phase-1-product-search.md)   | Product Search & Discovery       | 1 week   | Partially Complete |
+| [Phase 2](m3-phases/phase-2-recommendations.md)  | Recommendations Engine           | 1 week   | Partially Complete |
+| [Phase 3](m3-phases/phase-3-langgraph-router.md) | LangGraph Router & State Machine | 1 week   | Complete           |
 
 ### Why This Order?
 
@@ -125,27 +125,35 @@ Widget                API                    Services                 External
 
 ### Key Components
 
-| Component              | Location                           | Purpose                       |
-| ---------------------- | ---------------------------------- | ----------------------------- |
-| Product Search Service | `app/services/product_search.py`   | NLP-powered product discovery |
-| Recommendation Engine  | `app/services/recommendations.py`  | Similar products, upsells     |
-| LangGraph Router       | `app/services/langgraph_router.py` | Conversation state management |
-| Inventory Service      | `app/services/inventory.py`        | Real-time stock checking      |
-| Sales Analytics        | `app/services/sales_analytics.py`  | Conversion tracking           |
-| Product API            | `app/api/v1/products.py`           | Product search endpoints      |
+| Component              | Location                                | Purpose                                       |
+| ---------------------- | --------------------------------------- | --------------------------------------------- |
+| Search Service         | `app/services/search_service.py`        | Hybrid vector + full-text search (RRF)        |
+| Recommendation Service | `app/services/recommendation_service.py`| Similar, upsell, cross-sell, compare          |
+| LangGraph State        | `app/services/graph/state.py`           | ConversationState TypedDict (10 fields)       |
+| Intent Classifier      | `app/services/graph/nodes.py`           | GPT-4o intent classification (6 intents)      |
+| Router                 | `app/services/graph/router.py`          | Conditional routing by intent + confidence    |
+| Graph Nodes            | `app/services/graph/nodes.py`           | search, recommend, support, general, clarify  |
+| Graph Workflow         | `app/services/graph/workflow.py`        | LangGraph compilation (create_sales_graph)    |
+| System Prompts         | `app/services/graph/prompts.py`         | 6 specialized node prompts                    |
+| Product Tools          | `app/services/tools/product_tools.py`   | 6 LangChain tools (per-request factory)       |
+| Search Schemas         | `app/schemas/search.py`                 | ProductFilters, SearchRequest, SearchResponse |
+| Search API             | `app/api/v1/search.py`                  | POST /products/search                         |
+| Recommendations API    | `app/api/v1/recommendations.py`         | similar, upsell, compare endpoints            |
+| Chat Service           | `app/services/chat_service.py`          | LangGraph orchestration entry point           |
 
 ---
 
 ## Technical Decisions
 
-| Decision           | Choice                        | Rationale                                  |
-| ------------------ | ----------------------------- | ------------------------------------------ |
-| Search Engine      | Hybrid (Vector + Text)        | Best of semantic and keyword search        |
-| Recommendation     | Collaborative + Content       | Leverage both user behavior and features   |
-| State Management   | LangGraph                     | Visual workflow, easy debugging            |
-| Product Embeddings | OpenAI text-embedding-3-small | Consistent with existing knowledge base    |
-| Inventory Sync     | Real-time Shopify API         | Ensure accurate stock information          |
-| Size Guidance      | Rule-based + ML               | Combine size charts with customer feedback |
+| Decision             | Choice                              | Rationale                                       |
+| -------------------- | ----------------------------------- | ----------------------------------------------- |
+| Search Engine        | Hybrid (Vector + Text) with RRF     | Reciprocal Rank Fusion combines both effectively |
+| Recommendation       | Content-based (embeddings + rules)  | Works without user identity; sufficient for MVP  |
+| State Management     | LangGraph                           | Visual workflow, easy debugging                  |
+| Product Embeddings   | OpenAI text-embedding-3-small       | Consistent with existing knowledge base          |
+| Inventory Data       | Shopify sync to Product.variants    | Webhook-driven, no real-time API calls needed    |
+| Intent Classification| GPT-4o with temp=0, JSON response   | High accuracy, structured output                 |
+| Tool Architecture    | Per-request factory pattern          | Multi-tenant isolation via closure-bound tools   |
 
 ---
 
@@ -153,9 +161,18 @@ Widget                API                    Services                 External
 
 ### External Services
 
-- OpenAI API (GPT-4o + embeddings)
-- Shopify Admin API (product data, inventory)
-- LangGraph (conversation state management)
+- OpenAI API (GPT-4o for chat + intent classification, text-embedding-3-small for embeddings)
+- Shopify Admin API (product data synced to local DB via webhooks)
+- LangGraph + LangChain Core (conversation state machine and tool framework)
+
+### Python Packages (already in pyproject.toml)
+
+```toml
+langgraph >= 0.2.0
+langchain-core >= 0.3.0
+langchain-openai >= 0.3.0
+pgvector >= 0.3.6
+```
 
 ### Internal Prerequisites
 
@@ -169,29 +186,28 @@ Widget                API                    Services                 External
 
 From [ROADMAP.md](../../ROADMAP.md#milestone-3-sales--recommendation-agent):
 
-- [ ] Natural language product search
-- [ ] Recommendation engine
-- [ ] Product comparison generation
-- [ ] Size/fit guidance system
-- [ ] Inventory-aware responses
-- [ ] Add-to-cart deep links
-- [ ] Sales analytics dashboard
-- [ ] LangGraph state machine implementation
-- [ ] Intent classification system
-- [ ] Upsell and cross-sell logic
+- [x] Natural language product search
+- [x] Recommendation engine
+- [x] Product comparison generation
+- [ ] ~~Size/fit guidance system~~ — DEFERRED (see [deferred-features.md](deferred-features.md))
+- [x] Inventory-aware responses
+- [ ] ~~Add-to-cart deep links~~ — DEFERRED (see [deferred-features.md](deferred-features.md))
+- [ ] ~~Sales analytics dashboard~~ — DEFERRED (see [deferred-features.md](deferred-features.md))
+- [x] LangGraph state machine implementation
+- [x] Intent classification system
+- [x] Upsell and cross-sell logic
 
 ---
 
 ## Risk Mitigation
 
-| Risk                       | Mitigation                                      |
-| -------------------------- | ----------------------------------------------- |
-| Poor search relevance      | A/B test different embedding strategies         |
-| Slow recommendation engine | Cache popular recommendations, async processing |
-| LangGraph complexity       | Start simple, add complexity incrementally      |
-| Inventory sync delays      | Implement fallback to last known stock levels   |
-| Size guidance accuracy     | Collect feedback, continuously improve rules    |
-| High OpenAI costs          | Implement caching, optimize prompt efficiency   |
+| Risk                       | Mitigation                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| Poor search relevance      | Hybrid search (RRF) combines vector + keyword; tune weights if needed          |
+| Slow recommendation engine | Queries scoped to store_id with pgvector indexes; fast for typical catalog sizes|
+| LangGraph complexity       | Started simple with 6 nodes; add complexity incrementally                      |
+| Inventory sync delays      | Data synced from Shopify webhooks to Product.variants JSONB; no real-time dependency |
+| High OpenAI costs          | Intent classification uses temp=0 + max_tokens=100; tool loop capped at 3 iterations |
 
 ---
 
