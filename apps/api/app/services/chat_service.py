@@ -1,4 +1,4 @@
-"""Chat service orchestrating RAG and LLM for responses."""
+"""Chat service orchestrating LangGraph sales agent for responses."""
 
 import contextlib
 import json
@@ -14,20 +14,18 @@ from langchain_core.messages import (
     AIMessage,
     BaseMessage,
     HumanMessage,
-    SystemMessage,
     ToolMessage,
 )
-from langchain_openai import ChatOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.conversation import Channel, Conversation, ConversationStatus
 from app.models.message import Message, MessageRole
 from app.models.order_inquiry import InquiryResolution, InquiryType, OrderInquiry
 from app.models.store import Store
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.citation_service import CitationService
+from app.services.graph.workflow import create_sales_graph
 from app.services.retrieval_service import RetrievalService, RetrievedChunk, RetrievedProduct
 
 logger = logging.getLogger(__name__)
@@ -36,20 +34,13 @@ logger = logging.getLogger(__name__)
 CHAT_MODEL = "gpt-4o"
 MAX_CONVERSATION_HISTORY = 10  # Last N messages to include
 MAX_RESPONSE_TOKENS = 800
-MAX_TOOL_ITERATIONS = 3
 
 
 class ChatService:
-    """Service for chat functionality with RAG and optional tool calling."""
+    """Service for chat functionality with LangGraph-based routing and tool calling."""
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
-        self.llm = ChatOpenAI(
-            model=CHAT_MODEL,
-            api_key=settings.openai_api_key,
-            temperature=0.7,
-            max_tokens=MAX_RESPONSE_TOKENS,
-        )
         self.retrieval_service = RetrievalService(db)
         self.citation_service = CitationService()
 
@@ -66,8 +57,8 @@ class ChatService:
         1. Gets or creates a conversation
         2. Saves the user message
         3. Retrieves relevant context via RAG
-        4. Optionally creates order tools (if store has read_orders scope)
-        5. Generates an AI response (with agentic loop if tools available)
+        4. Creates tools (order + product)
+        5. Runs LangGraph workflow (classify → route → respond)
         6. Saves and returns the response
 
         Args:
@@ -101,7 +92,6 @@ class ChatService:
         )
 
         # Retrieve relevant context (knowledge + products)
-        # Wrapped in try/except so chat continues with empty context if embedding fails
         try:
             chunks = await self.retrieval_service.retrieve_context(
                 query=request.message,
@@ -125,18 +115,31 @@ class ChatService:
             products = []
 
         # Create order tools when redis is available
-        tools = None
+        order_tools = None
         if redis_client:
             try:
                 from app.services.order_service import OrderService
                 from app.services.order_tools import create_order_tools
 
                 order_service = OrderService(self.db, redis_client)
-                tools = create_order_tools(order_service, store.id)
+                order_tools = create_order_tools(order_service, store.id)
             except Exception:
                 logger.exception("Failed to create order tools for store %s", store.id)
 
-        # Generate AI response
+        # Create product tools
+        product_tools = None
+        try:
+            from app.services.recommendation_service import RecommendationService
+            from app.services.search_service import SearchService
+            from app.services.tools.product_tools import create_product_tools
+
+            search_service = SearchService(self.db)
+            recommendation_service = RecommendationService(self.db)
+            product_tools = create_product_tools(search_service, recommendation_service, store.id)
+        except Exception:
+            logger.exception("Failed to create product tools for store %s", store.id)
+
+        # Generate AI response via LangGraph
         try:
             (
                 response_content,
@@ -145,11 +148,13 @@ class ChatService:
                 tool_results_record,
             ) = await self._generate_response(
                 store_name=store.name,
+                store_id=store.id,
                 user_message=request.message,
                 context_chunks=chunks,
                 conversation_history=history,
                 product_context=products,
-                tools=tools,
+                order_tools=order_tools,
+                product_tools=product_tools,
             )
         except HTTPException:
             raise
@@ -266,29 +271,60 @@ class ChatService:
     async def _generate_response(
         self,
         store_name: str,
+        store_id: UUID,
         user_message: str,
         context_chunks: list[RetrievedChunk],
         conversation_history: list[Message],
         product_context: list[RetrievedProduct] | None = None,
-        tools: list[Any] | None = None,
+        order_tools: list[Any] | None = None,
+        product_tools: list[Any] | None = None,
     ) -> tuple[str, int, list[dict[str, Any]] | None, list[dict[str, Any]] | None]:
-        """Generate AI response using LangChain with optional tool calling.
+        """Generate AI response using LangGraph workflow.
+
+        The graph classifies the user's intent, routes to the appropriate node
+        (search, recommend, support, general, clarify), and generates a response
+        using the relevant tools and context.
 
         Returns:
             Tuple of (content, tokens_used, tool_calls_record, tool_results_record)
         """
-        system_prompt = self._build_system_prompt(
-            store_name, context_chunks, product_context or [], has_order_tools=bool(tools)
-        )
-        messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
+        # Build context strings for prompts
+        context_text = self.citation_service.format_context_for_prompt(context_chunks)
 
-        # Build conversation history using LangChain message types
+        product_text = ""
+        if product_context:
+            product_parts = []
+            for i, p in enumerate(product_context, 1):
+                desc = (p.description or "")[:200]
+                price_str = f" - Price: ${p.price}" if p.price else ""
+                product_parts.append(f"[P{i}] {p.title}{price_str}\n{desc}")
+            product_text = "\n\n".join(product_parts)
+
+        context_section = ""
+        if context_text or product_text:
+            context_section = f"""
+CONTEXT FROM KNOWLEDGE BASE:
+{context_text or "No knowledge base context available."}
+
+PRODUCT INFORMATION:
+{product_text or "No matching products found."}"""
+
+        # Build the LangGraph workflow
+        graph = create_sales_graph(
+            product_tools=product_tools,
+            order_tools=order_tools,
+            context_text=context_text,
+            product_text=product_text,
+            context_section=context_section,
+        )
+
+        # Build conversation history as LangChain messages
+        messages: list[BaseMessage] = []
         for msg in conversation_history:
             if msg.role == MessageRole.USER:
                 messages.append(HumanMessage(content=msg.content))
             elif msg.role == MessageRole.ASSISTANT:
                 if msg.tool_calls:
-                    # Reconstruct AIMessage with tool_calls for context
                     messages.append(
                         AIMessage(
                             content=msg.content or "",
@@ -302,7 +338,6 @@ class ChatService:
                             ],
                         )
                     )
-                    # Add corresponding ToolMessages
                     if msg.tool_results:
                         for tr in msg.tool_results:
                             messages.append(
@@ -316,52 +351,42 @@ class ChatService:
 
         messages.append(HumanMessage(content=user_message))
 
-        llm = self.llm.bind_tools(tools) if tools else self.llm
-        all_tool_calls: list[dict[str, Any]] = []
-        all_tool_results: list[dict[str, Any]] = []
+        # Build initial state
+        initial_state = {
+            "messages": messages,
+            "intent": "",
+            "confidence": 0.0,
+            "store_id": str(store_id),
+            "store_name": store_name,
+            "tools_used": [],
+            "has_order_tools": bool(order_tools),
+            "has_product_tools": bool(product_tools),
+            "tool_calls_record": [],
+            "tool_results_record": [],
+        }
 
-        # Agentic loop (max iterations to prevent runaway)
-        for _ in range(MAX_TOOL_ITERATIONS):
-            response: AIMessage = await llm.ainvoke(messages)  # type: ignore[assignment,unused-ignore]
+        # Run the graph
+        final_state = await graph.ainvoke(initial_state)
 
-            if not response.tool_calls:
-                # Final text response
-                tokens = (
-                    response.usage_metadata.get("total_tokens", 0) if response.usage_metadata else 0
-                )
-                content = response.content if isinstance(response.content, str) else ""
-                return (
-                    content,
-                    tokens,
-                    all_tool_calls or None,
-                    all_tool_results or None,
-                )
+        # Extract response from the last AI message
+        response_content = ""
+        for msg in reversed(final_state["messages"]):
+            if isinstance(msg, AIMessage):
+                response_content = msg.content if isinstance(msg.content, str) else ""
+                break
 
-            # Process tool calls
-            messages.append(response)
-            for tc in response.tool_calls:
-                all_tool_calls.append({"id": tc["id"], "name": tc["name"], "args": tc["args"]})
+        # Extract tool records from final state
+        tool_calls_record = final_state.get("tool_calls_record") or None
+        tool_results_record = final_state.get("tool_results_record") or None
 
-                # Find and execute the matching tool
-                tool_fn = next((t for t in tools if t.name == tc["name"]), None) if tools else None
-                try:
-                    if tool_fn:
-                        result = await tool_fn.ainvoke(tc["args"])
-                    else:
-                        result = f"Unknown tool: {tc['name']}"
-                except Exception as e:
-                    logger.exception("Tool execution error: %s", tc["name"])
-                    result = f"Error: {e}"
+        # We don't get token counts from the graph (multiple LLM calls)
+        tokens_used = 0
 
-                all_tool_results.append({"tool_call_id": tc["id"], "result": str(result)})
-                messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
-
-        # Max iterations exceeded — get final text response
         return (
-            "I'm having trouble processing your request. Please try again.",
-            0,
-            all_tool_calls or None,
-            all_tool_results or None,
+            response_content,
+            tokens_used,
+            tool_calls_record if tool_calls_record else None,
+            tool_results_record if tool_results_record else None,
         )
 
     async def _maybe_record_order_inquiry(
@@ -405,55 +430,3 @@ class ChatService:
                 extra_data={},
             )
             self.db.add(inquiry)
-
-    def _build_system_prompt(
-        self,
-        store_name: str,
-        context_chunks: list[RetrievedChunk],
-        product_context: list[RetrievedProduct] | None = None,
-        has_order_tools: bool = False,
-    ) -> str:
-        """Build the system prompt with context and optional order instructions."""
-        context_text = self.citation_service.format_context_for_prompt(context_chunks)
-
-        product_text = ""
-        if product_context:
-            product_parts = []
-            for i, p in enumerate(product_context, 1):
-                desc = (p.description or "")[:200]
-                price_str = f" - Price: ${p.price}" if p.price else ""
-                product_parts.append(f"[P{i}] {p.title}{price_str}\n{desc}")
-            product_text = "\n\n".join(product_parts)
-
-        order_instructions = ""
-        if has_order_tools:
-            order_instructions = """
-
-ORDER STATUS INSTRUCTIONS:
-1. When a customer asks about their order status, you MUST ask for BOTH their order number AND email address before using the verification tool
-2. NEVER reveal order details without successful verification
-3. After verification, use the lookup_order_status tool for follow-up questions about the same order
-4. When sharing tracking info, always include the tracking number and carrier name
-5. Use get_tracking_details when the customer asks specifically about tracking, shipping, or delivery
-6. If verification fails, suggest the customer double-check their order number and email"""
-
-        return f"""You are a helpful customer support agent for {store_name}.
-
-Your role is to assist customers with their questions about products, orders, shipping, returns, and other store policies.
-
-INSTRUCTIONS:
-1. Use the provided context to answer questions accurately
-2. Be friendly, professional, and concise
-3. If the context doesn't contain enough information to answer, say so honestly
-4. Do NOT make up information - only use what's in the context
-5. If you reference information from the context, mention which source it came from
-6. Keep responses focused and avoid unnecessary verbosity
-{order_instructions}
-
-CONTEXT FROM KNOWLEDGE BASE:
-{context_text}
-
-PRODUCT INFORMATION:
-{product_text or "No matching products found."}
-
-Remember: Only answer based on the context provided. If you're unsure, ask for clarification or direct the customer to contact support."""

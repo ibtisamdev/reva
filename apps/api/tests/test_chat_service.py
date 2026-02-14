@@ -18,7 +18,6 @@ from app.models.message import Message, MessageRole
 from app.models.store import Store
 from app.schemas.chat import ChatRequest
 from app.services.chat_service import ChatService
-from app.services.retrieval_service import RetrievedChunk, RetrievedProduct
 
 
 class TestChatServiceProcessMessage:
@@ -94,7 +93,7 @@ class TestChatServiceProcessMessage:
         mock_openai_chat: MagicMock,
         mock_embedding_service: MagicMock,
     ) -> None:
-        """Token usage from OpenAI is stored in the assistant message."""
+        """Token usage is stored in the assistant message (0 for LangGraph)."""
         service = ChatService(db_session)
         request = ChatRequest(message="Hello")
 
@@ -102,7 +101,8 @@ class TestChatServiceProcessMessage:
 
         msg = await db_session.get(Message, response.message_id)
         assert msg is not None
-        assert msg.tokens_used == 150  # From mock_openai_response fixture
+        # LangGraph makes multiple LLM calls, so we don't track aggregate tokens
+        assert msg.tokens_used == 0
 
     @pytest.mark.asyncio
     async def test_stores_sources_in_message(
@@ -197,7 +197,7 @@ class TestChatServiceProcessMessage:
         """OpenAI API failure raises HTTPException with 503."""
         from fastapi import HTTPException
 
-        with patch("app.services.chat_service.ChatOpenAI") as mock_class:
+        with patch("app.services.graph.nodes.ChatOpenAI") as mock_class:
             mock_llm = MagicMock()
             mock_class.return_value = mock_llm
             mock_llm.ainvoke = AsyncMock(side_effect=Exception("OpenAI API error"))
@@ -347,84 +347,6 @@ class TestChatServiceGetConversationHistory:
         # Should be the 10 most recent (5-14), in chronological order
         assert history[0].content == "Message 5"
         assert history[-1].content == "Message 14"
-
-
-class TestChatServiceBuildSystemPrompt:
-    """Tests for ChatService._build_system_prompt()."""
-
-    def test_includes_store_name(self) -> None:
-        """System prompt includes the store name."""
-        service = ChatService(MagicMock())  # DB not needed for this method
-
-        prompt = service._build_system_prompt("Acme Store", [], [])
-
-        assert "Acme Store" in prompt
-
-    def test_includes_knowledge_context(self) -> None:
-        """System prompt includes formatted context from chunks."""
-        service = ChatService(MagicMock())
-        chunks = [
-            RetrievedChunk(
-                chunk_id=uuid.uuid4(),
-                article_id=uuid.uuid4(),
-                content="Returns are accepted within 30 days of purchase.",
-                chunk_index=0,
-                similarity=0.92,
-                article_title="Return Policy",
-                article_url="/pages/returns",
-            )
-        ]
-
-        prompt = service._build_system_prompt("Test Store", chunks, [])
-
-        assert "Return Policy" in prompt
-        assert "Returns are accepted within 30 days" in prompt
-
-    def test_includes_product_context(self) -> None:
-        """System prompt includes product information with prices."""
-        service = ChatService(MagicMock())
-        products = [
-            RetrievedProduct(
-                product_id=uuid.uuid4(),
-                title="Widget Pro",
-                description="A professional-grade widget for experts.",
-                price="99.99",
-                similarity=0.85,
-            )
-        ]
-
-        prompt = service._build_system_prompt("Test Store", [], products)
-
-        assert "Widget Pro" in prompt
-        assert "99.99" in prompt
-        assert "professional-grade" in prompt
-
-    def test_handles_empty_context(self) -> None:
-        """System prompt handles empty context gracefully."""
-        service = ChatService(MagicMock())
-
-        prompt = service._build_system_prompt("Test Store", [], [])
-
-        assert "Test Store" in prompt
-        # Citation service returns "No relevant context found." for empty chunks
-        assert "No relevant context found" in prompt or "No matching products" in prompt
-
-    def test_includes_order_instructions_when_tools_available(self) -> None:
-        """System prompt includes order instructions when has_order_tools=True."""
-        service = ChatService(MagicMock())
-
-        prompt = service._build_system_prompt("Test Store", [], [], has_order_tools=True)
-
-        assert "ORDER STATUS INSTRUCTIONS" in prompt
-        assert "verification" in prompt.lower()
-
-    def test_excludes_order_instructions_when_no_tools(self) -> None:
-        """System prompt omits order instructions when has_order_tools=False."""
-        service = ChatService(MagicMock())
-
-        prompt = service._build_system_prompt("Test Store", [], [], has_order_tools=False)
-
-        assert "ORDER STATUS INSTRUCTIONS" not in prompt
 
 
 class TestChatServiceOrderToolIntegration:

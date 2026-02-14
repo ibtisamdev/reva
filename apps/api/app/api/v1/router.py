@@ -2,7 +2,18 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import analytics, chat, health, knowledge, orders, products, shopify, stores
+from app.api.v1 import (
+    analytics,
+    chat,
+    health,
+    knowledge,
+    orders,
+    products,
+    recommendations,
+    search,
+    shopify,
+    stores,
+)
 from app.api.v1.webhooks import shopify as shopify_webhooks
 
 api_router = APIRouter()
@@ -64,4 +75,18 @@ api_router.include_router(
     analytics.router,
     prefix="/analytics",
     tags=["analytics"],
+)
+
+# Product search (for widget, no auth required)
+api_router.include_router(
+    search.router,
+    prefix="/products",
+    tags=["search"],
+)
+
+# Product recommendations (for widget, no auth required)
+api_router.include_router(
+    recommendations.router,
+    prefix="/products",
+    tags=["recommendations"],
 )
