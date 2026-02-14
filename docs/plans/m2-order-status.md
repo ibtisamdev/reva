@@ -14,7 +14,7 @@ Milestone 2 builds on M1's foundation to handle order status inquiries. This mil
 
 - [ ] Customer can verify identity using order number + email
 - [ ] Agent can lookup orders from Shopify API
-- [ ] Real-time tracking information from carriers (AfterShip integration)
+- [ ] Tracking information from Shopify fulfillments (tracking numbers, URLs, carrier names)
 - [ ] Secure order details sharing with proper verification
 - [ ] Multi-order support for customers with order history
 - [ ] Order timeline showing full journey from purchase to delivery
@@ -67,12 +67,7 @@ Widget                API                    Services                 External
   |                    | verify_customer()      |                        |
   |                    |----------------------->|                        |
   |                    |                        | Shopify Orders API     |
-  |                    |                        |----------------------->|
-  |                    |                        |<-----------------------|
-  |                    |<-----------------------|                        |
-  |                    | lookup_order()         |                        |
-  |                    |----------------------->|                        |
-  |                    |                        | AfterShip Tracking API |
+  |                    |                        | (orders + fulfillments)|
   |                    |                        |----------------------->|
   |                    |                        |<-----------------------|
   |                    |<-----------------------|                        |
@@ -91,7 +86,7 @@ Widget                API                    Services                 External
 | --------------------- | ------------------------------ | ----------------------------- |
 | Customer Verification | `app/services/verification.py` | Secure identity validation    |
 | Order Lookup Service  | `app/services/orders.py`       | Shopify order retrieval       |
-| Tracking Service      | `app/services/tracking.py`     | Carrier tracking integration  |
+| Tracking Service      | `app/services/tracking.py`     | Shopify fulfillment tracking data |
 | Order Tools           | `app/tools/order_tools.py`     | LangChain tools for order ops |
 | WISMO Analytics       | `app/services/analytics.py`    | Order status insights         |
 | Magic Link Auth       | `app/services/auth_links.py`   | Secure email authentication   |
@@ -103,7 +98,7 @@ Widget                API                    Services                 External
 | Decision              | Choice                     | Rationale                           |
 | --------------------- | -------------------------- | ----------------------------------- |
 | Customer Verification | Order Number + Email Match | Balance security with UX simplicity |
-| Tracking Provider     | AfterShip API              | 1000+ carriers, unified interface   |
+| Tracking Provider     | Shopify Fulfillments API   | Already available from order data, no external dependency |
 | Tool Framework        | LangChain Tools            | Structured LLM tool calling         |
 | Order Caching         | Redis (15 min TTL)         | Reduce Shopify API calls            |
 | Magic Links           | JWT tokens (1 hour expiry) | Secure, stateless authentication    |
@@ -152,8 +147,7 @@ Full access to customer's order history
 
 ### External Services
 
-- Shopify Admin API (Orders, Fulfillments)
-- AfterShip API (tracking data)
+- Shopify Admin API (Orders, Fulfillments — includes tracking numbers, URLs, carrier names)
 - OpenAI API (enhanced with order context)
 - Redis (order caching)
 
@@ -178,8 +172,7 @@ From [ROADMAP.md](../../ROADMAP.md#milestone-2-order-status-agent):
 
 - [ ] Customer verification flow (Phase 1)
 - [ ] Shopify order lookup tool (Phase 1)
-- [ ] Carrier tracking integration - AfterShip (Phase 2)
-- [ ] ShipStation integration (Phase 2 - optional)
+- [ ] Shopify fulfillment tracking — tracking numbers, URLs, carrier names (Phase 2)
 - [ ] Order status response templates (Phase 1)
 - [ ] Magic link authentication (Phase 1 - optional)
 - [ ] WISMO analytics dashboard (Phase 3)
@@ -193,9 +186,8 @@ From [ROADMAP.md](../../ROADMAP.md#milestone-2-order-status-agent):
 | ----------------------- | --------------------------------------------- |
 | Shopify API rate limits | Implement caching, request queuing            |
 | Customer data privacy   | Strict verification, audit logs               |
-| Tracking data delays    | Cache with TTL, show last known status        |
+| Tracking data freshness | Cache with TTL, show last known status        |
 | False order matches     | Multi-factor verification (order + email)     |
-| AfterShip API downtime  | Graceful fallback to Shopify tracking numbers |
 
 ---
 
@@ -204,5 +196,5 @@ From [ROADMAP.md](../../ROADMAP.md#milestone-2-order-status-agent):
 - [ROADMAP.md - Milestone 2](../../ROADMAP.md#milestone-2-order-status-agent)
 - [M1 Product Q&A Bot](m1-product-qa.md)
 - [Shopify Admin API - Orders](https://shopify.dev/docs/api/admin-rest/2024-01/resources/order)
-- [AfterShip API Documentation](https://developers.aftership.com/)
+- [Deferred Features — Shipping Integrations](deferred-features.md)
 - [LangChain Tools Documentation](https://python.langchain.com/docs/modules/tools/)

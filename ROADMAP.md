@@ -62,7 +62,7 @@ M1 (MVP)        M2              M3              M4              M5              
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                              INTEGRATIONS ADDED PER MILESTONE                            │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
-│  M2: AfterShip, ShipStation (Shipping)                                                  │
+│  M2: (Shopify fulfillment data only — shipping integrations deferred)                    │
 │  M4: Klaviyo, Postscript, GA4 (Marketing)                                               │
 │  M6: Zendesk, Freshdesk, Slack (Helpdesk)                                               │
 │  M8: Public API, Webhooks, Custom Tools SDK (Developer)                                 │
@@ -282,28 +282,17 @@ Answer "Where is my order?" — the #1 support question (30-50% of all tickets).
 | Structured Output | Parse order data into response |
 | Conditional Logic | Different flows by order status |
 
-### Shipping Integrations
+### Tracking Approach
 
-To provide accurate tracking information across all carriers, integrate with shipping aggregators:
+M2 uses **Shopify fulfillment data only** for tracking. Shopify's Orders/Fulfillments API already provides tracking numbers, carrier names, and tracking URLs — sufficient for ~90% of WISMO queries. The agent provides the customer with a direct tracking link to the carrier's page.
 
-| Integration | Purpose | Priority | API |
-|-------------|---------|----------|-----|
-| **AfterShip** | Unified tracking for 1000+ carriers worldwide | P0 | REST API |
-| **ShipStation** | Shipping management platform data (labels, rates) | P1 | REST API |
-| **Shippo** | Multi-carrier tracking and shipping rates | P2 | REST API |
-| **Route** | Package protection status and claims | P2 | REST API |
-
-**Why these integrations matter:**
-- AfterShip provides a single API to track shipments across USPS, FedEx, UPS, DHL, and 1000+ other carriers
-- Merchants using ShipStation get richer data: estimated delivery dates, shipping labels created
-- Enables responses like: "Your package is at the Chicago sorting facility. Expected delivery: Tomorrow by 8pm"
+Third-party shipping integrations (AfterShip, ShipStation, etc.) are [deferred](docs/plans/deferred-features.md) and can be layered on later if merchants need inline tracking events or proactive delivery notifications.
 
 ### Deliverables
 
 - [ ] Customer verification flow
 - [ ] Shopify order lookup tool
-- [ ] Carrier tracking integration (AfterShip)
-- [ ] ShipStation integration (optional)
+- [ ] Shopify fulfillment tracking (tracking numbers, URLs, carrier names)
 - [ ] Order status response templates
 - [ ] Magic link authentication (optional)
 - [ ] WISMO analytics
@@ -1267,7 +1256,7 @@ abandoned_carts (
 |------|-------|-----------|------------------|
 | 1-2 | Shopify OAuth, product sync, basic RAG | M1: 40% | Shopify API |
 | 3-4 | Chat widget, dashboard, deploy MVP | M1: 100% ✓ | - |
-| 5-6 | Order lookup, verification, tracking | M2: 100% ✓ | AfterShip |
+| 5-6 | Order lookup, verification, tracking | M2: 100% ✓ | Shopify Orders API |
 | 7-8 | Sales agent, recommendations | M3: 100% ✓ | - |
 | 9-10 | Cart recovery, email sequences | M4: 100% ✓ | Klaviyo, Resend |
 | 11-12 | Action agent (cancel, refund) | M5: 100% ✓ | - |
@@ -1282,12 +1271,12 @@ abandoned_carts (
 | Milestone | Integrations Added | Total Integrations |
 |-----------|-------------------|-------------------|
 | M1 | Shopify | 1 |
-| M2 | + AfterShip, ShipStation | 3 |
-| M3 | - | 3 |
-| M4 | + Klaviyo, Resend, GA4 | 6 |
-| M5 | - | 6 |
-| M6 | + Slack, Zendesk, Twilio, WhatsApp | 10 |
-| M7 | + LangSmith | 11 |
+| M2 | (Shopify fulfillments only) | 1 |
+| M3 | - | 1 |
+| M4 | + Klaviyo, Resend, GA4 | 4 |
+| M5 | - | 4 |
+| M6 | + Slack, Zendesk, Twilio, WhatsApp | 8 |
+| M7 | + LangSmith | 9 |
 | M8 | + Public API, Webhooks, Custom Tools | Platform |
 
 ---
@@ -1323,7 +1312,7 @@ abandoned_carts (
 |-------------|-------------|---------|-------|-------|
 | Shopify | ✓ Native | ✓ Native | ✓ | ✓ |
 | Klaviyo | ✓ M4 | ✓ | ✓ | ✗ |
-| AfterShip | ✓ M2 | ✓ | ✗ | ✗ |
+| AfterShip | Deferred | ✓ | ✗ | ✗ |
 | Zendesk | ✓ M6 | ✗ | ✓ | ✗ |
 | Slack | ✓ M6 | ✓ | ✗ | ✗ |
 | WhatsApp | ✓ M6 | ✓ | ✓ | ✓ |
@@ -1370,10 +1359,10 @@ abandoned_carts (
 | Category | Integration | Milestone | Priority | Purpose |
 |----------|-------------|-----------|----------|---------|
 | **E-commerce** | Shopify | M1 | P0 | Core platform |
-| **Shipping** | AfterShip | M2 | P0 | Unified tracking |
-| **Shipping** | ShipStation | M2 | P1 | Shipping management |
-| **Shipping** | Shippo | M2 | P2 | Multi-carrier |
-| **Shipping** | Route | M2 | P2 | Package protection |
+| **Shipping** | AfterShip | Deferred | - | Unified tracking ([details](docs/plans/deferred-features.md)) |
+| **Shipping** | ShipStation | Deferred | - | Shipping management ([details](docs/plans/deferred-features.md)) |
+| **Shipping** | Shippo | Deferred | - | Multi-carrier ([details](docs/plans/deferred-features.md)) |
+| **Shipping** | Route | Deferred | - | Package protection ([details](docs/plans/deferred-features.md)) |
 | **Marketing** | Klaviyo | M4 | P0 | Email coordination |
 | **Marketing** | Postscript | M4 | P1 | SMS coordination |
 | **Marketing** | Attentive | M4 | P2 | SMS alternative |

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import chat, health, knowledge, products, shopify, stores
+from app.api.v1 import analytics, chat, health, knowledge, orders, products, shopify, stores
 from app.api.v1.webhooks import shopify as shopify_webhooks
 
 api_router = APIRouter()
@@ -50,4 +50,18 @@ api_router.include_router(
     products.router,
     prefix="/products",
     tags=["products"],
+)
+
+# Orders (verification endpoint for widget)
+api_router.include_router(
+    orders.router,
+    prefix="/orders",
+    tags=["orders"],
+)
+
+# Analytics (WISMO dashboard)
+api_router.include_router(
+    analytics.router,
+    prefix="/analytics",
+    tags=["analytics"],
 )

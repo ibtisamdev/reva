@@ -34,6 +34,7 @@ from app.models.conversation import Channel, Conversation, ConversationStatus
 from app.models.integration import IntegrationStatus, PlatformType, StoreIntegration
 from app.models.knowledge import ContentType, KnowledgeArticle, KnowledgeChunk
 from app.models.message import Message, MessageRole
+from app.models.order_inquiry import InquiryResolution, InquiryType, OrderInquiry
 from app.models.product import Product
 from app.models.store import Store
 
@@ -59,6 +60,7 @@ _test_session_factory: Any = None
 
 # Tables to truncate after each test (reverse dependency order)
 _TABLES_TO_TRUNCATE = [
+    "order_inquiries",
     "messages",
     "conversations",
     "knowledge_chunks",
@@ -442,6 +444,41 @@ def integration_factory(db_session: AsyncSession) -> Callable[..., Any]:
     return _create
 
 
+@pytest.fixture
+def order_inquiry_factory(db_session: AsyncSession) -> Callable[..., Any]:
+    """Factory that creates OrderInquiry instances."""
+
+    async def _create(
+        *,
+        store_id: UUID,
+        conversation_id: UUID | None = None,
+        customer_email: str | None = "customer@example.com",
+        order_number: str | None = "#1001",
+        inquiry_type: InquiryType = InquiryType.ORDER_STATUS,
+        order_status: str | None = "paid",
+        fulfillment_status: str | None = None,
+        resolution: InquiryResolution | None = InquiryResolution.ANSWERED,
+        extra_data: dict[str, Any] | None = None,
+    ) -> OrderInquiry:
+        inquiry = OrderInquiry(
+            store_id=store_id,
+            conversation_id=conversation_id,
+            customer_email=customer_email,
+            order_number=order_number,
+            inquiry_type=inquiry_type,
+            order_status=order_status,
+            fulfillment_status=fulfillment_status,
+            resolution=resolution,
+            extra_data=extra_data or {},
+        )
+        db_session.add(inquiry)
+        await db_session.commit()
+        await db_session.refresh(inquiry)
+        return inquiry
+
+    return _create
+
+
 # ---------------------------------------------------------------------------
 # Convenience fixtures (pre-built models)
 # ---------------------------------------------------------------------------
@@ -504,29 +541,34 @@ def mock_openai_response() -> dict[str, Any]:
 def mock_openai_chat(
     mock_openai_response: dict[str, Any],
 ) -> Generator[MagicMock, None, None]:
-    """Patch AsyncOpenAI in chat_service to return mock responses.
+    """Patch ChatOpenAI in chat_service to return mock LangChain AIMessage responses.
 
     Usage:
         def test_something(mock_openai_chat):
-            # OpenAI calls will return the mock response
+            # LLM calls will return the mock response
             ...
     """
-    with patch("app.services.chat_service.AsyncOpenAI") as mock_class:
-        mock_client = MagicMock()
-        mock_class.return_value = mock_client
+    from langchain_core.messages import AIMessage
 
-        # Create the nested mock structure for chat.completions.create
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = mock_openai_response["choices"][0]["message"][
-            "content"
-        ]
-        mock_response.usage = MagicMock()
-        mock_response.usage.total_tokens = mock_openai_response["usage"]["total_tokens"]
+    mock_ai_message = AIMessage(
+        content=mock_openai_response["choices"][0]["message"]["content"],
+        usage_metadata={
+            "input_tokens": mock_openai_response["usage"]["prompt_tokens"],
+            "output_tokens": mock_openai_response["usage"]["completion_tokens"],
+            "total_tokens": mock_openai_response["usage"]["total_tokens"],
+        },
+    )
 
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    with patch("app.services.chat_service.ChatOpenAI") as mock_class:
+        mock_llm = MagicMock()
+        mock_class.return_value = mock_llm
 
-        yield mock_client
+        # ainvoke returns the mock AIMessage (no tool calls)
+        mock_llm.ainvoke = AsyncMock(return_value=mock_ai_message)
+        # bind_tools returns the same mock (tools don't trigger in basic tests)
+        mock_llm.bind_tools = MagicMock(return_value=mock_llm)
+
+        yield mock_llm
 
 
 @pytest.fixture
@@ -682,14 +724,17 @@ def shopify_oauth_hmac() -> Callable[[dict[str, str]], str]:
 def mock_shopify_token_exchange() -> Generator[MagicMock, None, None]:
     """Mock the Shopify OAuth token exchange HTTP call.
 
-    Patches httpx.AsyncClient in oauth.py to return a mock access token.
+    Patches httpx.AsyncClient in oauth.py to return a mock access token + scopes.
     """
     with patch("app.integrations.shopify.oauth.httpx.AsyncClient") as mock_class:
         mock_client = AsyncMock()
         mock_class.return_value.__aenter__.return_value = mock_client
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {"access_token": "shpat_test_access_token_123"}
+        mock_response.json.return_value = {
+            "access_token": "shpat_test_access_token_123",
+            "scope": "read_products,read_content,read_orders",
+        }
         mock_response.raise_for_status = MagicMock()
         mock_client.post.return_value = mock_response
 
@@ -1016,3 +1061,69 @@ def mock_pdf_extract() -> Generator[MagicMock, None, None]:
     with patch("app.services.pdf_service.extract_text_from_pdf") as mock_extract:
         mock_extract.return_value = "This is extracted text from the PDF document."
         yield mock_extract
+
+
+# ---------------------------------------------------------------------------
+# Order Service Testing Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sample_shopify_order() -> dict[str, Any]:
+    """A sample Shopify order JSON as returned by the Admin API.
+
+    Includes line items, customer info, shipping address, and financial/fulfillment status.
+    """
+    return {
+        "id": 5551234567890,
+        "name": "#1001",
+        "email": "customer@example.com",
+        "financial_status": "paid",
+        "fulfillment_status": None,
+        "created_at": "2024-06-15T10:30:00-04:00",
+        "total_price": "79.98",
+        "currency": "USD",
+        "cancelled_at": None,
+        "customer": {
+            "first_name": "Jane",
+            "last_name": "Doe",
+        },
+        "shipping_address": {
+            "city": "New York",
+            "province": "NY",
+        },
+        "line_items": [
+            {
+                "title": "Widget Pro",
+                "quantity": 2,
+                "price": "39.99",
+                "variant_title": "Blue / Large",
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def sample_fulfillments() -> list[dict[str, Any]]:
+    """Sample fulfillment data as returned by Shopify's order fulfillments endpoint."""
+    return [
+        {
+            "status": "success",
+            "tracking_number": "1Z999AA10123456784",
+            "tracking_url": "https://wwwapps.ups.com/tracking/tracking.cgi?tracknum=1Z999AA10123456784",
+            "tracking_company": "UPS",
+            "shipment_status": "delivered",
+            "created_at": "2024-06-16T14:00:00-04:00",
+        },
+    ]
+
+
+@pytest.fixture
+def mock_decrypt_token() -> Generator[MagicMock, None, None]:
+    """Patch decrypt_token in the order_service module to return a fixed token.
+
+    Prevents tests from needing real encryption keys.
+    """
+    with patch("app.services.order_service.decrypt_token") as mock_fn:
+        mock_fn.return_value = "shpat_decrypted_test_token"
+        yield mock_fn

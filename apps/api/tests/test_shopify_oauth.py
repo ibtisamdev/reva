@@ -173,10 +173,11 @@ class TestExchangeCodeForToken:
     """Unit tests for Shopify token exchange."""
 
     async def test_success(self, mock_shopify_token_exchange: MagicMock) -> None:
-        """exchange_code_for_token returns access token on success."""
-        token = await exchange_code_for_token("shop.myshopify.com", "auth-code-123")
+        """exchange_code_for_token returns access token and scopes on success."""
+        token, scopes = await exchange_code_for_token("shop.myshopify.com", "auth-code-123")
 
         assert token == "shpat_test_access_token_123"
+        assert scopes == "read_products,read_content,read_orders"
         mock_shopify_token_exchange.post.assert_called_once()
 
     async def test_http_error_raises(self) -> None:

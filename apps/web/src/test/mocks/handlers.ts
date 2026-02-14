@@ -14,6 +14,9 @@ import {
   mockProducts,
   mockShopifyConnection,
   mockSyncStatus,
+  mockWismoSummary,
+  mockWismoTrend,
+  mockWismoInquiries,
 } from './data';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -129,5 +132,18 @@ export const handlers = [
 
   http.post(`${API_BASE}/api/v1/knowledge/pdf`, () => {
     return HttpResponse.json(mockIngestionResponse);
+  }),
+
+  // WISMO Analytics
+  http.get(`${API_BASE}/api/v1/analytics/wismo/summary`, () => {
+    return HttpResponse.json(mockWismoSummary);
+  }),
+
+  http.get(`${API_BASE}/api/v1/analytics/wismo/trend`, () => {
+    return HttpResponse.json(mockWismoTrend);
+  }),
+
+  http.get(`${API_BASE}/api/v1/analytics/wismo/inquiries`, () => {
+    return HttpResponse.json(mockPaginatedResponse(mockWismoInquiries));
   }),
 ];

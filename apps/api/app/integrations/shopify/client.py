@@ -46,6 +46,51 @@ class ShopifyClient:
             pages: list[dict[str, Any]] = response.json().get("pages", [])
             return pages
 
+    async def get_order_by_number(self, order_number: str) -> dict[str, Any] | None:
+        """Fetch a single order by its display number (e.g., '#1001' or '1001').
+
+        Returns the order dict or None if not found.
+        """
+        # Strip '#' prefix if present
+        clean_number = order_number.lstrip("#")
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
+            response = await client.get(
+                f"{self.base_url}/orders.json",
+                params={"name": clean_number, "status": "any", "limit": 1},
+            )
+            response.raise_for_status()
+            orders = response.json().get("orders", [])
+            return orders[0] if orders else None
+
+    async def get_orders_by_email(self, email: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Fetch orders by customer email address."""
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
+            response = await client.get(
+                f"{self.base_url}/orders.json",
+                params={"email": email, "status": "any", "limit": limit},
+            )
+            response.raise_for_status()
+            orders: list[dict[str, Any]] = response.json().get("orders", [])
+            return orders
+
+    async def get_order_by_id(self, order_id: int) -> dict[str, Any] | None:
+        """Fetch a single order by its Shopify ID. Returns None on 404."""
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
+            response = await client.get(f"{self.base_url}/orders/{order_id}.json")
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            order: dict[str, Any] = response.json().get("order", {})
+            return order
+
+    async def get_order_fulfillments(self, order_id: int) -> list[dict[str, Any]]:
+        """Fetch fulfillments for an order (tracking data source)."""
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
+            response = await client.get(f"{self.base_url}/orders/{order_id}/fulfillments.json")
+            response.raise_for_status()
+            fulfillments: list[dict[str, Any]] = response.json().get("fulfillments", [])
+            return fulfillments
+
     async def register_webhooks(self) -> None:
         """Register product webhooks for incremental sync."""
         topics = ["products/create", "products/update", "products/delete"]

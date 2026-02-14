@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # Shopify
     shopify_client_id: str = ""
     shopify_client_secret: str = ""
-    shopify_scopes: str = "read_products,read_content"
+    shopify_scopes: str = "read_products,read_content,read_orders"
     shopify_api_version: str = "2025-01"
 
     # URLs

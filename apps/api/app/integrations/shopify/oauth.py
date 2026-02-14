@@ -55,7 +55,7 @@ def build_auth_url(shop: str, nonce: str) -> str:
     return f"https://{shop}/admin/oauth/authorize?{params}"
 
 
-async def exchange_code_for_token(shop: str, code: str) -> str:
+async def exchange_code_for_token(shop: str, code: str) -> tuple[str, str]:
     """Exchange the OAuth authorization code for a permanent access token.
 
     Args:
@@ -63,7 +63,7 @@ async def exchange_code_for_token(shop: str, code: str) -> str:
         code: The authorization code from Shopify.
 
     Returns:
-        The access token string.
+        Tuple of (access_token, granted_scopes).
 
     Raises:
         httpx.HTTPStatusError: If the token exchange fails.
@@ -80,5 +80,4 @@ async def exchange_code_for_token(shop: str, code: str) -> str:
         )
         response.raise_for_status()
         data = response.json()
-        token: str = data["access_token"]
-        return token
+        return data["access_token"], data.get("scope", "")

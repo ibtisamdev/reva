@@ -1,359 +1,246 @@
-# Phase 2: Shipping Integration & Carrier Tracking
+# Phase 2: Shopify Fulfillment Tracking
 
-> **Parent:** [M2 Order Status Agent](../m2-order-status.md)  
-> **Duration:** 1 week  
-> **Status:** Not Started  
+> **Parent:** [M2 Order Status Agent](../m2-order-status.md)
+> **Duration:** 1 week
+> **Status:** Not Started
 > **Dependencies:** Phase 1 complete (customer verification & order lookup)
 
 ---
 
 ## Goal
 
-Integrate with shipping carriers and tracking services to provide real-time package tracking information. Primary integration with AfterShip for unified tracking across 1000+ carriers.
+Extract and present tracking information from Shopify fulfillment data so customers can get shipping status and tracking links directly in chat. No external tracking service required — Shopify fulfillments already provide tracking numbers, carrier names, and tracking URLs.
 
 ---
 
 ## Tasks
 
-### 2.1 AfterShip Integration Service
+### 2.1 Tracking Data Extraction Service
 
 **Location:** `apps/api/app/services/tracking.py`
 
-- [ ] Create AfterShip API client wrapper
-- [ ] Implement tracking number lookup
-- [ ] Support multiple carriers (USPS, FedEx, UPS, DHL, etc.)
-- [ ] Handle tracking webhooks for real-time updates
-- [ ] Cache tracking data with appropriate TTL (30 minutes)
-- [ ] Map carrier tracking events to customer-friendly messages
+- [ ] Create service to extract tracking info from Shopify fulfillment responses
+- [ ] Parse fulfillment data: tracking_number, tracking_url, tracking_company
+- [ ] Handle multiple fulfillments per order (partial shipments)
+- [ ] Handle orders with no fulfillment yet (unfulfilled)
+- [ ] Cache fulfillment data with appropriate TTL (15 minutes, same as order cache)
+- [ ] Map fulfillment statuses to customer-friendly messages
 
-**AfterShip Client:**
+**Tracking Service:**
 
 ```python
-class AfterShipService:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.base_url = "https://api.aftership.com/v4"
+class TrackingService:
+    def __init__(self, redis: Redis):
+        self.redis = redis
 
-    async def create_tracking(
+    async def get_tracking_info(
         self,
-        tracking_number: str,
-        carrier: str = None
-    ) -> TrackingInfo:
-        """Add tracking number to AfterShip for monitoring."""
+        fulfillments: list[dict],
+    ) -> list[TrackingInfo]:
+        """Extract tracking info from Shopify fulfillment data."""
+        # 1. Parse each fulfillment for tracking details
+        # 2. Return structured tracking info with carrier links
 
-    async def get_tracking(self, tracking_number: str) -> TrackingInfo:
-        """Get current tracking status and events."""
-
-    async def detect_carrier(self, tracking_number: str) -> list[str]:
-        """Auto-detect possible carriers for tracking number."""
+    def format_tracking_response(
+        self,
+        tracking_info: list[TrackingInfo],
+    ) -> str:
+        """Format tracking info for customer-friendly chat response."""
+        # 1. Format each tracking entry with carrier name + link
+        # 2. Handle single vs multiple packages
+        # 3. Handle missing tracking (label created but not shipped)
 ```
 
-### 2.2 Tracking Data Models
+### 2.2 Shopify Fulfillment Data Model
 
-**Location:** `apps/api/app/models/tracking.py`
+**Location:** `apps/api/app/schemas/tracking.py`
 
-- [ ] Create tracking information database models
-- [ ] Store tracking events and status updates
-- [ ] Link tracking data to Shopify fulfillments
-- [ ] Support multiple tracking numbers per order
+- [ ] Create Pydantic schemas for fulfillment tracking data
+- [ ] Map Shopify fulfillment statuses to internal statuses
+- [ ] Support multiple tracking numbers per fulfillment
 
-**Database Schema:**
+**No new database tables needed** — tracking data is fetched on-demand from Shopify and cached in Redis.
 
-```sql
--- Tracking information table
-CREATE TABLE tracking_info (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    store_id UUID NOT NULL REFERENCES stores(id),
-    order_id VARCHAR(100) NOT NULL,
-    tracking_number VARCHAR(100) NOT NULL,
-    carrier VARCHAR(50),
-    status VARCHAR(50),
-    estimated_delivery TIMESTAMP WITH TIME ZONE,
-    last_updated TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(tracking_number, carrier)
-);
+**Pydantic Schemas:**
 
--- Tracking events table
-CREATE TABLE tracking_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tracking_info_id UUID NOT NULL REFERENCES tracking_info(id),
-    event_time TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(50),
-    message TEXT,
-    location VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+```python
+class TrackingInfo(BaseModel):
+    tracking_number: str | None
+    tracking_url: str | None
+    carrier: str | None  # tracking_company from Shopify
+    fulfillment_status: str  # success, pending, open, failure, cancelled
+    shipment_status: str | None  # in_transit, delivered, etc. (if available)
+    created_at: datetime  # when fulfillment was created
+
+class OrderTrackingResponse(BaseModel):
+    order_number: str
+    fulfillment_status: str  # fulfilled, partial, unfulfilled
+    packages: list[TrackingInfo]
 ```
+
+**Shopify Fulfillment Status Mapping:**
+
+| Shopify Status | Customer Message |
+|----------------|------------------|
+| `unfulfilled` | "Your order is being prepared for shipping" |
+| `partial` | "Part of your order has shipped!" |
+| `fulfilled` | "Your order has shipped!" + tracking links |
 
 ### 2.3 Enhanced Order Tools with Tracking
 
 **Location:** `apps/api/app/tools/order_tools.py` (modify existing)
 
 - [ ] Add `TrackingLookupTool` for LangChain integration
-- [ ] Enhance `OrderLookupTool` to include tracking information
-- [ ] Create `EstimatedDeliveryTool` for delivery predictions
-- [ ] Handle tracking errors gracefully (invalid numbers, carrier issues)
+- [ ] Enhance `OrderLookupTool` to include fulfillment/tracking data
+- [ ] Handle orders with no tracking info gracefully
 
-**Enhanced LangChain Tools:**
+**LangChain Tools:**
 
 ```python
 class TrackingLookupTool(BaseTool):
     name = "tracking_lookup"
-    description = "Get real-time tracking information for a package"
-
-    def _run(self, tracking_number: str, carrier: str = None) -> str:
-        # 1. Query AfterShip for tracking info
-        # 2. Format tracking events for customer
-        # 3. Include estimated delivery if available
-        # 4. Return formatted tracking update
-
-class EstimatedDeliveryTool(BaseTool):
-    name = "estimated_delivery"
-    description = "Get estimated delivery date for an order"
+    description = "Get tracking information for an order's shipments"
 
     def _run(self, order_number: str) -> str:
-        # 1. Get order fulfillments
-        # 2. Check tracking data for delivery estimates
-        # 3. Return estimated delivery information
+        # 1. Get order with fulfillments from Shopify (or cache)
+        # 2. Extract tracking info from fulfillments
+        # 3. Format response with tracking links
+        # 4. Return customer-friendly tracking update
 ```
 
-### 2.4 Tracking Event Processing
-
-**Location:** `apps/api/app/workers/tracking_tasks.py`
-
-- [ ] Create Celery task for tracking updates
-- [ ] Process AfterShip webhooks asynchronously
-- [ ] Update tracking status in database
-- [ ] Send notifications for delivery updates (optional)
-- [ ] Handle tracking data cleanup (old events)
-
-**Tracking Tasks:**
-
-```python
-@celery_app.task
-async def update_tracking_info(tracking_number: str, carrier: str):
-    """Update tracking information from AfterShip."""
-    # 1. Fetch latest tracking data
-    # 2. Update database records
-    # 3. Process new tracking events
-    # 4. Cache updated information
-
-@celery_app.task
-async def process_tracking_webhook(webhook_data: dict):
-    """Process real-time tracking updates from AfterShip."""
-    # 1. Validate webhook signature
-    # 2. Extract tracking information
-    # 3. Update database
-    # 4. Trigger any notifications
-```
-
-### 2.5 Tracking Response Templates
+### 2.4 Tracking Response Templates
 
 **Location:** `apps/api/app/templates/tracking_responses.py`
 
-- [ ] Create templates for different tracking statuses
-- [ ] Include location and timing information
-- [ ] Handle delivery exceptions and delays
-- [ ] Support multiple packages per order
+- [ ] Create templates for different fulfillment statuses
+- [ ] Include tracking links for each package
+- [ ] Handle multiple packages per order
+- [ ] Handle missing tracking numbers (fulfilled but no tracking)
 
 **Tracking Templates:**
 
 ```python
 TRACKING_STATUS_TEMPLATES = {
-    "in_transit": "📦 Your package is on its way!\n\nTracking: {tracking_number}\nLast update: {last_event}\nLocation: {current_location}\nEstimated delivery: {estimated_delivery}",
+    "fulfilled_with_tracking": (
+        "Your order has shipped!\n\n"
+        "Carrier: {carrier}\n"
+        "Tracking number: {tracking_number}\n"
+        "Track your package: {tracking_url}"
+    ),
 
-    "out_for_delivery": "🚚 Great news! Your package is out for delivery today!\n\nTracking: {tracking_number}\nExpected delivery: Today by {delivery_time}",
+    "fulfilled_no_tracking": (
+        "Your order has been fulfilled! "
+        "A tracking number hasn't been added yet — "
+        "it should be available shortly."
+    ),
 
-    "delivered": "✅ Your package has been delivered!\n\nDelivered: {delivery_time}\nLocation: {delivery_location}\nSigned by: {signature}",
+    "partial_fulfillment": (
+        "Part of your order has shipped!\n\n"
+        "{shipped_items}\n\n"
+        "The rest of your order is being prepared."
+    ),
 
-    "exception": "⚠️ There's an update on your package:\n\n{exception_message}\n\nTracking: {tracking_number}\nCarrier: {carrier}\n\nContact the carrier for more details.",
+    "unfulfilled": (
+        "Your order is confirmed and being prepared for shipping. "
+        "You'll get tracking information once it ships."
+    ),
 
-    "pending": "📋 Your tracking number has been created but the package hasn't been picked up yet.\n\nTracking: {tracking_number}\nCarrier: {carrier}"
+    "multiple_packages": (
+        "Your order shipped in {count} packages:\n\n"
+        "{package_details}"
+    ),
 }
 ```
 
-### 2.6 ShipStation Integration (Optional)
-
-**Location:** `apps/api/app/services/shipstation.py`
-
-- [ ] Create ShipStation API client for enhanced shipping data
-- [ ] Fetch shipping labels and rates information
-- [ ] Get detailed fulfillment center information
-- [ ] Support ShipStation-specific tracking features
-
-**ShipStation Service:**
-
-```python
-class ShipStationService:
-    def __init__(self, api_key: str, api_secret: str):
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.base_url = "https://ssapi.shipstation.com"
-
-    async def get_shipment(self, shipment_id: str) -> ShipmentInfo:
-        """Get detailed shipment information from ShipStation."""
-
-    async def get_tracking_info(self, order_number: str) -> list[TrackingInfo]:
-        """Get tracking information for ShipStation orders."""
-```
-
-### 2.7 Webhook Endpoints
-
-**Location:** `apps/api/app/api/v1/webhooks/tracking.py`
-
-- [ ] Create AfterShip webhook endpoint
-- [ ] Validate webhook signatures
-- [ ] Process tracking updates asynchronously
-- [ ] Handle webhook retry logic
-- [ ] Support multiple webhook sources (AfterShip, ShipStation)
-
-**Webhook Endpoints:**
-
-```python
-@router.post("/aftership")
-async def aftership_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks
-):
-    """Handle AfterShip tracking webhooks."""
-    # 1. Validate webhook signature
-    # 2. Parse tracking update
-    # 3. Queue background task for processing
-    # 4. Return 200 OK
-
-@router.post("/shipstation")
-async def shipstation_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks
-):
-    """Handle ShipStation webhooks."""
-    # Similar processing for ShipStation events
-```
-
-### 2.8 Enhanced Chat Integration
+### 2.5 Enhanced Chat Integration
 
 **Location:** `apps/api/app/services/chat.py` (modify existing)
 
 - [ ] Integrate tracking tools into chat pipeline
 - [ ] Detect tracking-related queries
-- [ ] Provide proactive tracking updates
-- [ ] Handle multiple tracking numbers per conversation
+- [ ] Include tracking info in order status responses automatically
 
 **Tracking Intent Detection:**
 
 ```python
 TRACKING_INTENT_KEYWORDS = [
-    "tracking", "shipped", "delivery", "package", "carrier",
-    "ups", "fedex", "usps", "dhl", "where is", "when will"
+    "tracking", "shipped", "delivery", "package",
+    "where is", "when will", "shipping status"
 ]
 
 async def enhance_order_response_with_tracking(
-    order: Order,
-    fulfillments: list[Fulfillment]
+    order: dict,
 ) -> str:
     """Add tracking information to order response."""
-    # 1. Get tracking numbers from fulfillments
-    # 2. Fetch latest tracking data
-    # 3. Format comprehensive response
-    # 4. Include delivery estimates
+    # 1. Get fulfillments from order data
+    # 2. Extract tracking info
+    # 3. Format response with tracking links
 ```
 
 ---
 
 ## Files to Create/Modify
 
-| File                                  | Action | Purpose                       |
-| ------------------------------------- | ------ | ----------------------------- |
-| `app/services/tracking.py`            | Create | AfterShip integration service |
-| `app/services/shipstation.py`         | Create | ShipStation integration       |
-| `app/models/tracking.py`              | Create | Tracking data models          |
-| `app/templates/tracking_responses.py` | Create | Tracking response templates   |
-| `app/workers/tracking_tasks.py`       | Create | Async tracking processing     |
-| `app/api/v1/webhooks/__init__.py`     | Create | Webhooks package init         |
-| `app/api/v1/webhooks/tracking.py`     | Create | Tracking webhook endpoints    |
-| `app/schemas/tracking.py`             | Create | Tracking Pydantic models      |
-| `app/tools/order_tools.py`            | Modify | Add tracking tools            |
-| `app/services/chat.py`                | Modify | Integrate tracking features   |
-| `app/core/config.py`                  | Modify | Add tracking service configs  |
+| File                                  | Action | Purpose                              |
+| ------------------------------------- | ------ | ------------------------------------ |
+| `app/services/tracking.py`            | Create | Fulfillment tracking extraction      |
+| `app/schemas/tracking.py`             | Create | Tracking Pydantic schemas            |
+| `app/templates/tracking_responses.py` | Create | Tracking response templates          |
+| `app/tools/order_tools.py`            | Modify | Add tracking tools                   |
+| `app/services/chat.py`                | Modify | Integrate tracking in chat responses |
 
 ---
 
 ## Dependencies
 
-```toml
-# Add to pyproject.toml
-httpx = "^0.27"              # HTTP client for API calls
-cryptography = "^41.0"       # Webhook signature validation
-python-multipart = "^0.0.6"  # Webhook form data parsing
-```
+No new external dependencies required. Uses existing:
+- `httpx` — for Shopify API calls (already in project)
+- `redis` — for caching fulfillment data (already in project)
 
 ---
 
 ## Configuration
 
-```python
-# Add to app/core/config.py
-class Settings(BaseSettings):
-    # Existing settings...
-
-    # AfterShip configuration
-    aftership_api_key: str = Field(..., env="AFTERSHIP_API_KEY")
-    aftership_webhook_secret: str = Field(..., env="AFTERSHIP_WEBHOOK_SECRET")
-
-    # ShipStation configuration (optional)
-    shipstation_api_key: str = Field("", env="SHIPSTATION_API_KEY")
-    shipstation_api_secret: str = Field("", env="SHIPSTATION_API_SECRET")
-
-    # Tracking settings
-    tracking_cache_ttl: int = Field(1800, env="TRACKING_CACHE_TTL")  # 30 minutes
-    tracking_webhook_timeout: int = Field(30, env="TRACKING_WEBHOOK_TIMEOUT")
-```
+No new configuration needed. Tracking data comes from the same Shopify API credentials used for order lookup.
 
 ---
 
 ## API Endpoints
 
-| Endpoint                                 | Method | Purpose                      |
-| ---------------------------------------- | ------ | ---------------------------- |
-| `/api/v1/tracking/{tracking_number}`     | GET    | Get tracking information     |
-| `/api/v1/orders/{order_number}/tracking` | GET    | Get all tracking for order   |
-| `/api/v1/webhooks/aftership`             | POST   | AfterShip webhook receiver   |
-| `/api/v1/webhooks/shipstation`           | POST   | ShipStation webhook receiver |
+| Endpoint                                 | Method | Purpose                    |
+| ---------------------------------------- | ------ | -------------------------- |
+| `/api/v1/orders/{order_number}/tracking` | GET    | Get tracking for an order  |
 
 ---
 
 ## Testing
 
-- [ ] Unit test: AfterShip API client with mocked responses
-- [ ] Unit test: Tracking event processing and database updates
-- [ ] Unit test: LangChain tracking tools functionality
-- [ ] Integration test: Full tracking lookup flow
-- [ ] Test: Webhook signature validation
-- [ ] Test: Tracking data caching and TTL
-- [ ] Test: Multiple tracking numbers per order
-- [ ] Test: Carrier auto-detection for tracking numbers
-- [ ] Load test: Webhook processing under high volume
+- [ ] Unit test: Tracking info extraction from Shopify fulfillment data
+- [ ] Unit test: Tracking response formatting (single/multiple packages)
+- [ ] Unit test: Handling unfulfilled orders and missing tracking numbers
+- [ ] Unit test: LangChain tracking tool functionality
+- [ ] Integration test: Full tracking lookup flow via chat
+- [ ] Test: Redis caching of fulfillment data
+- [ ] Test: Multiple fulfillments per order (partial shipments)
 
 ---
 
 ## Acceptance Criteria
 
-1. Can retrieve real-time tracking information from AfterShip
-2. Tracking data is cached appropriately to reduce API calls
-3. Webhooks process tracking updates in real-time
-4. LangChain tools provide accurate tracking information
-5. Multiple tracking numbers per order are handled correctly
-6. Tracking status is displayed in customer-friendly language
-7. System gracefully handles tracking API failures
-8. Webhook signatures are validated for security
+1. Can extract tracking info from Shopify fulfillment data
+2. Provides tracking links for shipped orders
+3. Handles unfulfilled, partially fulfilled, and fully fulfilled orders
+4. Multiple packages per order are handled correctly
+5. Tracking status is displayed in customer-friendly language
+6. Fulfillment data is cached to reduce Shopify API calls
+7. LangChain tools provide accurate tracking information
 
 ---
 
 ## Notes
 
-- AfterShip provides free tier with 100 trackings/month for testing
-- Consider implementing carrier-specific optimizations for major carriers
-- Tracking data should be cleaned up periodically (older than 90 days)
-- Consider adding delivery notifications via email/SMS in future phases
-- Ensure tracking data privacy and compliance with carrier terms of service
+- This approach uses Shopify as the sole source of tracking data
+- Customers click through to the carrier's tracking page for real-time details
+- For inline tracking events (e.g., "in transit in Memphis"), a third-party service like AfterShip would be needed — see [deferred features](../deferred-features.md)
+- Shopify provides `tracking_url` which is a direct link to the carrier's tracking page
+- The `tracking_company` field identifies the carrier (USPS, FedEx, UPS, DHL, etc.)
