@@ -7,6 +7,8 @@ const mockSignInEmail = vi.fn();
 const mockSignInSocial = vi.fn();
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
+const mockOrgList = vi.fn();
+const mockSetActive = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -25,6 +27,10 @@ vi.mock('@/lib/auth-client', () => ({
   signIn: {
     email: (...args: unknown[]) => mockSignInEmail(...args),
     social: (...args: unknown[]) => mockSignInSocial(...args),
+  },
+  organization: {
+    list: (...args: unknown[]) => mockOrgList(...args),
+    setActive: (...args: unknown[]) => mockSetActive(...args),
   },
 }));
 
@@ -51,6 +57,8 @@ describe('SignInForm', () => {
   it('should submit form with email and password', async () => {
     const user = userEvent.setup();
     mockSignInEmail.mockResolvedValue({ data: { user: { id: '1' } }, error: null });
+    mockOrgList.mockResolvedValue({ data: [{ id: 'org-1' }] });
+    mockSetActive.mockResolvedValue({});
 
     render(<SignInForm />);
 
@@ -63,10 +71,9 @@ describe('SignInForm', () => {
         email: 'test@example.com',
         password: 'password123',
       });
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockRefresh).toHaveBeenCalled();
     });
-
-    expect(mockPush).toHaveBeenCalledWith('/dashboard');
-    expect(mockRefresh).toHaveBeenCalled();
   });
 
   it('should display error on failed sign in', async () => {
