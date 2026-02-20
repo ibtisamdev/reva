@@ -11,12 +11,31 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.core.database import async_session_maker
+from app.core.database import async_session_maker, engine
 from app.models.abandoned_checkout import AbandonedCheckout, CheckoutStatus
 from app.models.store import Store
 from app.workers.celery_app import BaseTask, celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _run_async(coro):  # type: ignore[no-untyped-def]
+    """Run an async coroutine in a fresh event loop, disposing DB connections after.
+
+    Each Celery prefork worker creates a new event loop per task. asyncpg connections
+    are bound to the loop that created them — if pooled connections from a previous
+    (closed) loop are reused, RuntimeError("Event loop is closed") is raised.
+
+    Disposing the engine after each task clears stale pooled connections so the next
+    task gets fresh ones.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.run_until_complete(engine.dispose())
+        loop.close()
 
 
 # ---------------------------------------------------------------------------
@@ -36,14 +55,7 @@ def process_checkout_webhook(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
     """Upsert an AbandonedCheckout from a Shopify checkout webhook."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(
-            _process_checkout_webhook_async(UUID(store_id), event_type, payload)
-        )
-    finally:
-        loop.close()
+    return _run_async(_process_checkout_webhook_async(UUID(store_id), event_type, payload))
 
 
 async def _process_checkout_webhook_async(
@@ -147,12 +159,7 @@ def process_order_completed(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
     """Mark matching abandoned checkouts as completed when an order is placed."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(_process_order_completed_async(UUID(store_id), payload))
-    finally:
-        loop.close()
+    return _run_async(_process_order_completed_async(UUID(store_id), payload))
 
 
 async def _process_order_completed_async(store_id: UUID, payload: dict[str, Any]) -> dict[str, Any]:
@@ -223,12 +230,7 @@ async def _process_order_completed_async(store_id: UUID, payload: dict[str, Any]
 )
 def check_abandoned_checkouts(self: BaseTask) -> dict[str, Any]:  # noqa: ARG001
     """Periodic task: detect abandoned checkouts and trigger recovery sequences."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(_check_abandoned_checkouts_async())
-    finally:
-        loop.close()
+    return _run_async(_check_abandoned_checkouts_async())
 
 
 async def _check_abandoned_checkouts_async() -> dict[str, Any]:
@@ -316,14 +318,9 @@ def start_recovery_sequence(
     customer_email: str,
 ) -> dict[str, Any]:
     """Start a recovery email sequence for an abandoned checkout."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(
-            _start_recovery_sequence_async(UUID(store_id), UUID(checkout_id), customer_email)
-        )
-    finally:
-        loop.close()
+    return _run_async(
+        _start_recovery_sequence_async(UUID(store_id), UUID(checkout_id), customer_email)
+    )
 
 
 async def _start_recovery_sequence_async(
@@ -357,14 +354,7 @@ def execute_sequence_step(
     store_id: str,
 ) -> dict[str, Any]:
     """Execute the current step of a recovery sequence."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(
-            _execute_sequence_step_async(UUID(sequence_id), UUID(store_id))
-        )
-    finally:
-        loop.close()
+    return _run_async(_execute_sequence_step_async(UUID(sequence_id), UUID(store_id)))
 
 
 async def _execute_sequence_step_async(sequence_id: UUID, store_id: UUID) -> dict[str, Any]:
@@ -388,14 +378,7 @@ def stop_sequences_for_email(
     reason: str,
 ) -> dict[str, Any]:
     """Stop all active recovery sequences for an email."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(
-            _stop_sequences_for_email_async(UUID(store_id), email, reason)
-        )
-    finally:
-        loop.close()
+    return _run_async(_stop_sequences_for_email_async(UUID(store_id), email, reason))
 
 
 async def _stop_sequences_for_email_async(
