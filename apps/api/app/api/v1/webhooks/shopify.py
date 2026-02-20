@@ -1,4 +1,4 @@
-"""Shopify webhook handlers for product sync."""
+"""Shopify webhook handlers for product sync and cart recovery."""
 
 import json
 from typing import Any
@@ -13,6 +13,7 @@ from app.core.deps import get_db
 from app.integrations.shopify.webhooks import verify_webhook
 from app.models.integration import IntegrationStatus, PlatformType, StoreIntegration
 from app.models.product import Product
+from app.workers.tasks.recovery import process_checkout_webhook, process_order_completed
 from app.workers.tasks.shopify import sync_single_product
 
 router = APIRouter()
@@ -96,3 +97,57 @@ async def products_delete(
     await db.commit()
 
     return {"status": "deleted"}
+
+
+# --- Cart Recovery Webhooks ---
+
+
+@router.post("/checkouts-create")
+async def checkouts_create(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Handle checkout creation webhook."""
+    _, data = await _verify_and_parse(request)
+    shop = request.headers.get("X-Shopify-Shop-Domain", "")
+    store_id = await _get_store_id_from_shop(shop, db)
+
+    if not store_id:
+        return {"status": "ignored"}
+
+    process_checkout_webhook.delay(str(store_id), "create", data)
+    return {"status": "accepted"}
+
+
+@router.post("/checkouts-update")
+async def checkouts_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Handle checkout update webhook."""
+    _, data = await _verify_and_parse(request)
+    shop = request.headers.get("X-Shopify-Shop-Domain", "")
+    store_id = await _get_store_id_from_shop(shop, db)
+
+    if not store_id:
+        return {"status": "ignored"}
+
+    process_checkout_webhook.delay(str(store_id), "update", data)
+    return {"status": "accepted"}
+
+
+@router.post("/orders-create")
+async def orders_create(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Handle order creation webhook (marks checkouts as completed)."""
+    _, data = await _verify_and_parse(request)
+    shop = request.headers.get("X-Shopify-Shop-Domain", "")
+    store_id = await _get_store_id_from_shop(shop, db)
+
+    if not store_id:
+        return {"status": "ignored"}
+
+    process_order_completed.delay(str(store_id), data)
+    return {"status": "accepted"}

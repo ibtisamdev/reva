@@ -9,6 +9,7 @@ import type {
   ChatRequest,
   ChatResponse,
   ConversationDetailResponse,
+  RecoveryCheckResponse,
 } from '../types';
 
 // === Constants ===
@@ -218,6 +219,29 @@ export async function getConversationsBySession(
   const url = `${apiUrl}/api/v1/chat/conversations?store_id=${encodeURIComponent(storeId)}&session_id=${encodeURIComponent(sessionId)}`;
 
   return fetchWithRetry<ConversationDetailResponse[]>(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+/**
+ * Check if the current session has an active cart recovery.
+ *
+ * @param apiUrl - Base API URL
+ * @param storeId - Store identifier
+ * @param sessionId - Session identifier
+ * @returns RecoveryCheckResponse on success, ApiError on failure
+ */
+export async function checkRecovery(
+  apiUrl: string,
+  storeId: string,
+  sessionId: string
+): Promise<RecoveryCheckResponse | ApiError> {
+  const url = `${apiUrl}/api/v1/recovery/check?store_id=${encodeURIComponent(storeId)}&session_id=${encodeURIComponent(sessionId)}`;
+
+  return fetchWithRetry<RecoveryCheckResponse>(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

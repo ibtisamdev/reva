@@ -62,6 +62,17 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  beat:
+    image: ghcr.io/ibtisamdev/reva/api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    env_file: .env.production
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
   web:
     image: ghcr.io/ibtisamdev/reva/web:${IMAGE_TAG:-latest}
     restart: unless-stopped

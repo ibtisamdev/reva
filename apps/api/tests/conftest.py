@@ -29,6 +29,7 @@ from app.core.database import get_async_session
 from app.core.deps import get_db, get_redis
 from app.core.rate_limit import limiter
 from app.main import app
+from app.models.abandoned_checkout import AbandonedCheckout, CheckoutStatus
 from app.models.base import Base
 from app.models.conversation import Channel, Conversation, ConversationStatus
 from app.models.integration import IntegrationStatus, PlatformType, StoreIntegration
@@ -36,6 +37,7 @@ from app.models.knowledge import ContentType, KnowledgeArticle, KnowledgeChunk
 from app.models.message import Message, MessageRole
 from app.models.order_inquiry import InquiryResolution, InquiryType, OrderInquiry
 from app.models.product import Product
+from app.models.recovery_sequence import RecoverySequence, SequenceStatus
 from app.models.store import Store
 
 # ---------------------------------------------------------------------------
@@ -64,6 +66,10 @@ _TEST_DATABASE_URL = (
 
 # Tables to truncate after each test (reverse dependency order)
 _TABLES_TO_TRUNCATE = [
+    "recovery_events",
+    "recovery_sequences",
+    "email_unsubscribes",
+    "abandoned_checkouts",
     "order_inquiries",
     "messages",
     "conversations",
@@ -769,6 +775,7 @@ def mock_shopify_client() -> Generator[MagicMock, None, None]:
 
         # Default async method returns
         mock_instance.register_webhooks = AsyncMock()
+        mock_instance.register_recovery_webhooks = AsyncMock()
         mock_instance.delete_webhooks = AsyncMock()
         mock_instance.get_all_products = AsyncMock(return_value=[])
 
@@ -1144,6 +1151,147 @@ def sample_fulfillments() -> list[dict[str, Any]]:
             "created_at": "2024-06-16T14:00:00-04:00",
         },
     ]
+
+
+# ---------------------------------------------------------------------------
+# Recovery Testing Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def abandoned_checkout_factory(db_session: AsyncSession) -> Callable[..., Any]:
+    """Factory that creates AbandonedCheckout instances."""
+
+    async def _create(
+        *,
+        store_id: UUID,
+        shopify_checkout_id: str = "12345",
+        shopify_checkout_token: str | None = "tok_abc",
+        customer_email: str | None = "shopper@example.com",
+        customer_name: str | None = "Test Shopper",
+        total_price: str = "49.99",
+        currency: str = "USD",
+        line_items: list[dict[str, Any]] | None = None,
+        checkout_url: str | None = "https://test-store.myshopify.com/checkouts/abc",
+        status: CheckoutStatus = CheckoutStatus.ACTIVE,
+    ) -> AbandonedCheckout:
+        checkout = AbandonedCheckout(
+            store_id=store_id,
+            shopify_checkout_id=shopify_checkout_id,
+            shopify_checkout_token=shopify_checkout_token,
+            customer_email=customer_email,
+            customer_name=customer_name,
+            total_price=total_price,
+            currency=currency,
+            line_items=line_items or [{"title": "Test Product", "quantity": 1, "price": "49.99"}],
+            checkout_url=checkout_url,
+            status=status,
+        )
+        db_session.add(checkout)
+        await db_session.commit()
+        await db_session.refresh(checkout)
+        return checkout
+
+    return _create
+
+
+@pytest.fixture
+def recovery_sequence_factory(db_session: AsyncSession) -> Callable[..., Any]:
+    """Factory that creates RecoverySequence instances."""
+
+    async def _create(
+        *,
+        store_id: UUID,
+        abandoned_checkout_id: UUID,
+        customer_email: str = "shopper@example.com",
+        sequence_type: str = "first_time",
+        status: SequenceStatus = SequenceStatus.ACTIVE,
+        current_step_index: int = 0,
+    ) -> RecoverySequence:
+        from datetime import UTC, datetime, timedelta
+
+        now = datetime.now(UTC)
+        sequence = RecoverySequence(
+            store_id=store_id,
+            abandoned_checkout_id=abandoned_checkout_id,
+            customer_email=customer_email,
+            sequence_type=sequence_type,
+            status=status,
+            current_step_index=current_step_index,
+            steps_completed=[],
+            started_at=now,
+            next_step_at=now + timedelta(hours=2),
+        )
+        db_session.add(sequence)
+        await db_session.commit()
+        await db_session.refresh(sequence)
+        return sequence
+
+    return _create
+
+
+@pytest.fixture
+def mock_celery_recovery_tasks() -> Generator[dict[str, MagicMock], None, None]:
+    """Mock recovery Celery tasks to prevent actual execution in route tests."""
+    with (
+        patch("app.api.v1.webhooks.shopify.process_checkout_webhook") as mock_checkout,
+        patch("app.api.v1.webhooks.shopify.process_order_completed") as mock_order,
+        patch("app.workers.tasks.recovery.start_recovery_sequence") as mock_start,
+        patch("app.workers.tasks.recovery.execute_sequence_step") as mock_execute,
+        patch("app.workers.tasks.recovery.stop_sequences_for_email") as mock_stop,
+    ):
+        yield {
+            "process_checkout_webhook": mock_checkout,
+            "process_order_completed": mock_order,
+            "start_recovery_sequence": mock_start,
+            "execute_sequence_step": mock_execute,
+            "stop_sequences_for_email": mock_stop,
+        }
+
+
+@pytest.fixture
+def sample_shopify_checkout() -> dict[str, Any]:
+    """A sample Shopify checkout webhook payload."""
+    return {
+        "id": 12345678,
+        "token": "abc123token",
+        "email": "shopper@example.com",
+        "currency": "USD",
+        "total_price": "129.99",
+        "abandoned_checkout_url": "https://test-store.myshopify.com/checkouts/abc123",
+        "customer": {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "email": "shopper@example.com",
+        },
+        "billing_address": {
+            "first_name": "Jane",
+            "last_name": "Doe",
+        },
+        "line_items": [
+            {
+                "title": "Premium Widget",
+                "quantity": 2,
+                "price": "49.99",
+                "variant_title": "Blue / Large",
+                "image": {"src": "https://cdn.shopify.com/widget.jpg"},
+            },
+            {
+                "title": "Widget Accessory",
+                "quantity": 1,
+                "price": "30.01",
+                "variant_title": None,
+                "image": None,
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def mock_async_session_maker_recovery(_create_tables: None) -> Generator[None, None, None]:
+    """Patch async_session_maker so recovery tasks use the test database."""
+    with patch("app.workers.tasks.recovery.async_session_maker", _test_session_factory):
+        yield
 
 
 @pytest.fixture

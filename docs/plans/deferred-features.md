@@ -149,6 +149,36 @@ In-chat links that add products directly to the customer's Shopify cart.
 
 ---
 
+## M4 Deferred Features (originally M4)
+
+**Deferred from:** [M4 Cart Recovery Agent](m4-cart-recovery.md)
+
+### Widget-based Cart Tracking
+
+Pre-checkout abandonment detection via the embedded widget reading Shopify's client-side `/cart.json` API and correlating with customer emails from chat conversations.
+
+**When to reconsider:** If checkout-only recovery rates are insufficient, or to capture the ~70% of abandonments that happen before checkout.
+
+### Klaviyo Integration
+
+Duplicate email prevention by checking Klaviyo for existing abandoned cart flows before sending recovery emails.
+
+**When to reconsider:** Merchants using Klaviyo report duplicate recovery emails.
+
+### GA4 Measurement Protocol
+
+Server-side event tracking via `POST google-analytics.com/mp/collect`. UTM params on email links already provide basic GA4 attribution.
+
+**When to reconsider:** Merchants need server-side conversion attribution beyond UTM link tracking.
+
+### On-site Popup for Returning Visitors
+
+Widget-based popup for returning visitors with abandoned carts. Requires widget-based cart tracking to identify what was abandoned.
+
+**When to reconsider:** After widget-based cart tracking is implemented.
+
+---
+
 ## How to Reintroduce
 
 When the time comes to add these features:
