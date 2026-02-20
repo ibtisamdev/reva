@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from collections.abc import Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -19,7 +20,7 @@ from app.workers.celery_app import BaseTask, celery_app
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):  # type: ignore[no-untyped-def]
+def _run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine in a fresh event loop, disposing DB connections after.
 
     Each Celery prefork worker creates a new event loop per task. asyncpg connections
