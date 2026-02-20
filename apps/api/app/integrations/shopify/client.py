@@ -118,6 +118,32 @@ class ShopifyClient:
                         response.status_code,
                     )
 
+    async def register_recovery_webhooks(self) -> None:
+        """Register checkout and order webhooks for cart recovery."""
+        topics = ["checkouts/create", "checkouts/update", "orders/create"]
+        base_address = f"{settings.api_url}/api/v1/webhooks/shopify"
+
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
+            for topic in topics:
+                path = topic.replace("/", "-")
+                response = await client.post(
+                    f"{self.base_url}/webhooks.json",
+                    json={
+                        "webhook": {
+                            "topic": topic,
+                            "address": f"{base_address}/{path}",
+                            "format": "json",
+                        }
+                    },
+                )
+                if not response.is_success:
+                    logger.warning(
+                        "Failed to register recovery webhook %s for %s: %s",
+                        topic,
+                        self.shop_domain,
+                        response.status_code,
+                    )
+
     async def delete_webhooks(self) -> None:
         """Delete all webhooks for this app."""
         async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:

@@ -10,6 +10,7 @@ from app.api.v1 import (
     orders,
     products,
     recommendations,
+    recovery,
     search,
     shopify,
     stores,
@@ -75,6 +76,13 @@ api_router.include_router(
     analytics.router,
     prefix="/analytics",
     tags=["analytics"],
+)
+
+# Cart Recovery (mixed auth: dashboard endpoints require auth, widget/unsubscribe public)
+api_router.include_router(
+    recovery.router,
+    prefix="/recovery",
+    tags=["recovery"],
 )
 
 # Product search (for widget, no auth required)

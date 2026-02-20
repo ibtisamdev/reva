@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.workers.tasks.example",
         "app.workers.tasks.embedding",
         "app.workers.tasks.shopify",
+        "app.workers.tasks.recovery",
     ],
 )
 
@@ -44,11 +45,10 @@ celery_app.conf.update(
     },
     # Beat schedule (for periodic tasks)
     beat_schedule={
-        # Example periodic task
-        # "check-abandoned-carts": {
-        #     "task": "app.workers.tasks.recovery.check_abandoned_carts",
-        #     "schedule": 300.0,  # Every 5 minutes
-        # },
+        "check-abandoned-checkouts": {
+            "task": "tasks.recovery.check_abandoned_checkouts",
+            "schedule": 300.0,  # Every 5 minutes
+        },
     },
 )
 

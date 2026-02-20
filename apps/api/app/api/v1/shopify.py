@@ -159,6 +159,7 @@ async def callback(
     try:
         client = ShopifyClient(shop, access_token)
         await client.register_webhooks()
+        await client.register_recovery_webhooks()
     except Exception:
         pass  # Non-fatal — webhooks can be registered later
 

@@ -156,6 +156,29 @@ export interface ApiError {
   retryable: boolean;
 }
 
+// === Recovery Types ===
+
+/**
+ * A cart item in a recovery popup.
+ */
+export interface RecoveryItem {
+  title: string;
+  price: string;
+  image_url: string | null;
+  quantity: number;
+}
+
+/**
+ * Response from the recovery check endpoint.
+ */
+export interface RecoveryCheckResponse {
+  has_recovery: boolean;
+  items: RecoveryItem[];
+  checkout_url: string | null;
+  total_price: string | null;
+  sequence_id: string | null;
+}
+
 // === Global Window Extension ===
 
 declare global {
